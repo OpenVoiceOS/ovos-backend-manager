@@ -44,7 +44,13 @@ def _device_menu(uuid, view=False, identity=None):
     device = DeviceDatabase().get_device(uuid)
     if device:
         if view:
-            with popup(f'Device UUID: {device.uuid}'):
+            with popup(f'UUID: {device.uuid}'):
+
+                if identity:
+                    put_markdown(f'### identity2.json')
+                    put_code(json.dumps(identity, indent=4), "json")
+
+                put_markdown(f'### Device Data:')
                 put_table([
                     ['Name', device.name],
                     ['Location', device.device_location],
@@ -67,12 +73,11 @@ def _device_menu(uuid, view=False, identity=None):
                     ['Longitude', device.location["coordinate"]["longitude"]],
                     ['Timezone Code', device.location["timezone"]["code"]]
                 ])
-                if identity:
-                    put_markdown(f'### identity2.json')
-                    put_code(json.dumps(identity, indent=4), "json")
+
 
         opt = actions(label="What would you like to do?",
                       buttons=[{'label': "View device configuration", 'value': "view"},
+                               {'label': "View device identity", 'value': "identity"},
                                {'label': 'Change device name', 'value': "name"},
                                {'label': 'Change indoor location', 'value': "location"},
                                {'label': 'Change geographical location', 'value': "geo"},
@@ -83,10 +88,17 @@ def _device_menu(uuid, view=False, identity=None):
                                {'label': 'Change date format', 'value': "date"},
                                {'label': 'Change time format', 'value': "time"},
                                {'label': 'Change system units', 'value': "unit"},
-                               {'label': 'Admin Menu', 'value': "admin"}])
+                               {'label': 'Main Menu', 'value': "admin"}])
         with DeviceDatabase() as db:
             if opt == "admin":
-                _admin_menu()
+                _main_menu()
+                return
+            if opt == "identity":
+                identity = {"uuid": device.uuid,
+                            "expires_at": time.time() + 99999999999999,
+                            "accessToken": device.token,
+                            "refreshToken": device.token}
+                _device_menu(uuid, view=True, identity=identity)
                 return
             if opt == "opt-in":
                 opt_in = checkbox("Opt-in to open dataset",
@@ -111,9 +123,9 @@ def _device_menu(uuid, view=False, identity=None):
                               ['DMY', 'MDY'])
                 device.date_format = date
             if opt == "time":
-                time = select("Change time format",
+                tim = select("Change time format",
                               ['full', 'short'])
-                device.time_format = time
+                device.time_format = tim
             if opt == "unit":
                 unit = select("Change system units",
                               ['metric', 'imperial'])
@@ -147,7 +159,7 @@ def _device_menu(uuid, view=False, identity=None):
         _device_menu(uuid, view=opt == "view")
     else:
         popup(f"Device not found! Please verify uuid")
-        _admin_menu()
+        _main_menu()
 
 
 def _selene_menu(view=False):
@@ -177,7 +189,7 @@ def _selene_menu(view=False):
     if CONFIGURATION["selene"]["enabled"]:
         buttons = [{'label': "View configuration", 'value': "view"},
                    {'label': "Disable Selene", 'value': "selene"},
-                   {'label': 'Admin Menu', 'value': "admin"}]
+                   {'label': 'Main Menu', 'value': "admin"}]
 
         label = "Enable Proxy Pairing" if CONFIGURATION["selene"]["proxy_pairing"] else "Disable Proxy Pairing"
         buttons.insert(-2, {'label': label, 'value': "proxy"})
@@ -219,11 +231,11 @@ def _selene_menu(view=False):
     else:
         buttons = [{'label': "View configuration", 'value': "view"},
                    {'label': "Enable Selene", 'value': "selene"},
-                   {'label': 'Admin Menu', 'value': "admin"}]
+                   {'label': 'Main Menu', 'value': "admin"}]
 
     opt = actions(label="What would you like to do?", buttons=buttons)
     if opt == "admin":
-        _admin_menu()
+        _main_menu()
         return
     elif opt == "geolocation":
         CONFIGURATION["selene"]["proxy_geolocation"] = not CONFIGURATION["selene"]["proxy_geolocation"]
@@ -285,7 +297,7 @@ def _microservices_menu(view=False):
                {'label': 'Configure SMTP', 'value': "smtp"},
                {'label': 'Configure Wolfram Alpha', 'value': "wolfram"},
                {'label': 'Configure Weather', 'value': "weather"},
-               {'label': 'Admin Menu', 'value': "admin"}]
+               {'label': 'Main Menu', 'value': "admin"}]
 
     if CONFIGURATION["microservices"]["ovos_fallback"]:
         buttons.insert(-2, {'label': 'Disable OVOS microservices fallback', 'value': "ovos"})
@@ -294,7 +306,7 @@ def _microservices_menu(view=False):
 
     opt = actions(label="What would you like to do?", buttons=buttons)
     if opt == "admin":
-        _admin_menu()
+        _main_menu()
         return
     elif opt == "weather":
         opts = ["ovos", "selene"] if selene else ["ovos"]
@@ -405,7 +417,7 @@ def _backend_menu(view=False):
                {'label': 'Set default date format', 'value': "date"},
                {'label': 'Set default time format', 'value': "time"},
                {'label': 'Set default system units', 'value': "unit"},
-               {'label': 'Admin Menu', 'value': "admin"}]
+               {'label': 'Main Menu', 'value': "admin"}]
     if CONFIGURATION["override_location"]:
         buttons.insert(-2, {'label': 'Enable IP geolocation', 'value': "ip_geo"})
     else:
@@ -413,7 +425,7 @@ def _backend_menu(view=False):
 
     opt = actions(label="What would you like to do?", buttons=buttons)
     if opt == "admin":
-        _admin_menu()
+        _main_menu()
         return
     elif opt == "tts":
         tts = select("Choose a voice", list(CONFIGURATION["tts_configs"].keys()))
@@ -472,7 +484,32 @@ def _backend_menu(view=False):
         _backend_menu(view=False)
 
 
-def _admin_menu():
+def _device_select():
+    devices = {uuid: f"{device['name']}@{device['device_location']}"
+               for uuid, device in DeviceDatabase().items()}
+    uuid = actions(label="What device would you like to manage?",
+                   buttons=[{'label': d, 'value': uuid}
+                            for uuid, d in devices.items()])
+    _device_menu(uuid, view=True)
+
+
+def _pair_device():
+    uuid = str(uuid4())
+    code = generate_code()
+    token = f"{code}:{uuid}"
+    # add device to db
+    with DeviceDatabase() as db:
+        db.add_device(uuid, token)
+
+    identity = {"uuid": uuid,
+                "expires_at": time.time() + 99999999999999,
+                "accessToken": token,
+                "refreshToken": token}
+
+    _device_menu(uuid, view=True, identity=identity)
+
+
+def _main_menu():
     opt = actions(label="What would you like to do?",
                   buttons=[{'label': 'Manage a device', 'value': "device"},
                            {'label': 'Pair a device', 'value': "pair"},
@@ -480,19 +517,7 @@ def _admin_menu():
                            {'label': 'Configure Microservices', 'value': "services"},
                            {'label': 'Configure Selene Proxy', 'value': "selene"}])
     if opt == "pair":
-        uuid = str(uuid4())
-        code = generate_code()
-        token = f"{code}:{uuid}"
-        # add device to db
-        with DeviceDatabase() as db:
-            db.add_device(uuid, token)
-
-        identity = {"uuid": uuid,
-                    "expires_at": time.time() + 99999999999999,
-                    "accessToken": token,
-                    "refreshToken": token}
-
-        _device_menu(uuid, view=True, identity=identity)
+        _pair_device()
     elif opt == "services":
         _microservices_menu()
     elif opt == "backend":
@@ -500,10 +525,7 @@ def _admin_menu():
     elif opt == "selene":
         _selene_menu()
     elif opt == "device":
-        uuid = textarea("Select a device",
-                        placeholder="check the uuid in the identity file (identity2.json)",
-                        required=True)
-        _device_menu(uuid, view=True)
+        _device_select()
 
 
 def _admin_auth():
@@ -520,7 +542,7 @@ def app():
         put_text("This personal backend instance does not have the admin interface exposed")
         return
     _admin_auth()
-    _admin_menu()
+    _main_menu()
 
 
 if __name__ == '__main__':
