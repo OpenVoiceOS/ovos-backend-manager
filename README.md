@@ -10,8 +10,15 @@ run app.py
 
 ## Screenshots
 
-![](Screenshot%202022-09-19%20at%2022-22-22%20PyWebIO%20Application.png)
-![](Screenshot%202022-09-19%20at%2022-22-34%20PyWebIO%20Application.png)
-![](Screenshot%202022-09-19%20at%2022-32-03%20PyWebIO%20Application.png)
-![](Screenshot%202022-09-19%20at%2022-22-50%20PyWebIO%20Application.png)
-![](Screenshot%202022-09-19%20at%2022-24-11%20PyWebIO%20Application.png)
+![](./screenshots/Screenshot%202022-09-19%20at%2022-22-22%20PyWebIO%20Application.png)
+![](./screenshots/Screenshot%202022-09-20%20at%2013-40-21%20PyWebIO%20Application.png)
+![](./screenshots/Screenshot%202022-09-20%20at%2013-42-42%20PyWebIO%20Application.png)
+![](./screenshots/Screenshot%202022-09-20%20at%2013-43-19%20PyWebIO%20Application.png)
+![](./screenshots/Screenshot%202022-09-20%20at%2013-42-58%20PyWebIO%20Application.png)
+![](./screenshots/Screenshot%202022-09-20%20at%2013-40-32%20PyWebIO%20Application.png)
+![](./screenshots/Screenshot%202022-09-20%20at%2013-41-59%20PyWebIO%20Application.png)
+![](./screenshots/Screenshot%202022-09-20%20at%2013-40-41%20PyWebIO%20Application.png)
+![](./screenshots/Screenshot%202022-09-20%20at%2013-41-48%20PyWebIO%20Application.png)
+![](./screenshots/Screenshot%202022-09-20%20at%2013-43-47%20PyWebIO%20Application.png)
+![](./screenshots/Screenshot%202022-09-20%20at%2013-40-52%20PyWebIO%20Application.png)
+![](./screenshots/Screenshot%202022-09-20%20at%2013-41-09%20PyWebIO%20Application.png)
