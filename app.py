@@ -4,16 +4,15 @@ import time
 from uuid import uuid4
 
 from ovos_local_backend.configuration import CONFIGURATION
+from ovos_local_backend.database.metrics import JsonMetricDatabase
 from ovos_local_backend.database.settings import DeviceDatabase
+from ovos_local_backend.database.utterances import JsonUtteranceDatabase
+from ovos_local_backend.database.wakewords import JsonWakeWordDatabase
 from ovos_local_backend.utils import generate_code
 from ovos_local_backend.utils.geolocate import get_location_config
 from pywebio import start_server
 from pywebio.input import textarea, select, actions, checkbox, input_group, input, TEXT, NUMBER
 from pywebio.output import put_text, put_table, put_markdown, popup, put_code
-
-from ovos_local_backend.database.metrics import JsonMetricDatabase, Metric
-from ovos_local_backend.database.wakewords import JsonWakeWordDatabase, WakeWordRecording
-from ovos_local_backend.database.utterances import JsonUtteranceDatabase, UtteranceRecording
 
 STT_CONFIGS = {
     "OpenVoiceOS (google proxy)": {"module": "ovos-stt-plugin-server", "url": "https://stt.openvoiceos.com/stt"},
@@ -45,7 +44,7 @@ STT_CONFIGS = {
 }
 
 
-def _device_menu(uuid, view=False, identity=None):
+def _device_uuid_menu(uuid, view=False, identity=None):
     device = DeviceDatabase().get_device(uuid)
     if device:
         if view:
@@ -80,7 +79,8 @@ def _device_menu(uuid, view=False, identity=None):
                 ])
 
         opt = actions(label="What would you like to do?",
-                      buttons=[{'label': "View device configuration", 'value': "view"},
+                      buttons=[{'label': '<- Go Back', 'value': "main"},
+                               {'label': "View device configuration", 'value': "view"},
                                {'label': "View device identity", 'value': "identity"},
                                {'label': 'Change device name', 'value': "name"},
                                {'label': 'Change placement', 'value': "location"},
@@ -92,11 +92,10 @@ def _device_menu(uuid, view=False, identity=None):
                                {'label': 'Change date format', 'value': "date"},
                                {'label': 'Change time format', 'value': "time"},
                                {'label': 'Change system units', 'value': "unit"},
-                               {'label': 'Delete device', 'value': "delete"},
-                               {'label': 'Main Menu', 'value': "main"}])
+                               {'label': 'Delete device', 'value': "delete"}])
         with DeviceDatabase() as db:
             if opt == "main":
-                _main_menu()
+                _device_menu()
                 return
             if opt == "delete":
                 with popup("Are you sure you want to delete the device?"):
@@ -107,16 +106,16 @@ def _device_menu(uuid, view=False, identity=None):
                     if opt:
                         db.delete_device(uuid)
                         db.store()
-                        _main_menu()
+                        _device_menu()
                         return
-                    _device_menu(uuid)
+                    _device_uuid_menu(uuid)
                     return
             if opt == "identity":
                 identity = {"uuid": device.uuid,
                             "expires_at": time.time() + 99999999999999,
                             "accessToken": device.token,
                             "refreshToken": device.token}
-                _device_menu(uuid, view=True, identity=identity)
+                _device_uuid_menu(uuid, view=True, identity=identity)
                 return
             if opt == "opt-in":
                 opt_in = checkbox("Opt-in to open dataset",
@@ -142,7 +141,7 @@ def _device_menu(uuid, view=False, identity=None):
                 device.date_format = date
             if opt == "time":
                 tim = select("Change time format",
-                              ['full', 'short'])
+                             ['full', 'short'])
                 device.time_format = tim
             if opt == "unit":
                 unit = select("Change system units",
@@ -174,10 +173,10 @@ def _device_menu(uuid, view=False, identity=None):
 
         popup("Device updated!")
 
-        _device_menu(uuid, view=opt == "view")
+        _device_uuid_menu(uuid, view=opt == "view")
     else:
         popup(f"Device not found! Please verify uuid")
-        _main_menu()
+        _device_menu()
 
 
 def _selene_menu(view=False):
@@ -205,9 +204,9 @@ def _selene_menu(view=False):
             ])
 
     if CONFIGURATION["selene"]["enabled"]:
-        buttons = [{'label': "View configuration", 'value': "view"},
-                   {'label': "Disable Selene", 'value': "selene"},
-                   {'label': 'Main Menu', 'value': "main"}]
+        buttons = [{'label': '<- Go Back', 'value': "main"},
+                   {'label': "View configuration", 'value': "view"},
+                   {'label': "Disable Selene", 'value': "selene"}]
 
         label = "Enable Proxy Pairing" if CONFIGURATION["selene"]["proxy_pairing"] else "Disable Proxy Pairing"
         buttons.insert(-2, {'label': label, 'value': "proxy"})
@@ -247,9 +246,10 @@ def _selene_menu(view=False):
         buttons.insert(-2, {'label': label, 'value': "stt"})
 
     else:
-        buttons = [{'label': "View configuration", 'value': "view"},
-                   {'label': "Enable Selene", 'value': "selene"},
-                   {'label': 'Main Menu', 'value': "main"}]
+        buttons = [{'label': '<- Go Back', 'value': "main"},
+                   {'label': "View configuration", 'value': "view"},
+                   {'label': "Enable Selene", 'value': "selene"}
+                   ]
 
     opt = actions(label="What would you like to do?", buttons=buttons)
     if opt == "main":
@@ -309,13 +309,14 @@ def _microservices_menu(view=False):
                 ['OpenWeatherMap Key', CONFIGURATION["microservices"]["owm_key"]]
             ])
 
-    buttons = [{'label': "View configuration", 'value': "view"},
+    buttons = [{'label': '<- Go Back', 'value': "main"},
+               {'label': "View configuration", 'value': "view"},
                {'label': 'Configure STT', 'value': "stt"},
                {'label': 'Configure Secrets', 'value': "secrets"},
                {'label': 'Configure SMTP', 'value': "smtp"},
                {'label': 'Configure Wolfram Alpha', 'value': "wolfram"},
-               {'label': 'Configure Weather', 'value': "weather"},
-               {'label': 'Main Menu', 'value': "main"}]
+               {'label': 'Configure Weather', 'value': "weather"}
+               ]
 
     if CONFIGURATION["microservices"]["ovos_fallback"]:
         buttons.insert(-2, {'label': 'Disable OVOS microservices fallback', 'value': "ovos"})
@@ -426,7 +427,8 @@ def _backend_menu(view=False):
 
     auth = 'Enable device auth' if not CONFIGURATION["skip_auth"] else 'Disable device auth'
 
-    buttons = [{'label': "View configuration", 'value': "view"},
+    buttons = [{'label': '<- Go Back', 'value': "main"},
+               {'label': "View configuration", 'value': "view"},
                {'label': auth, 'value': "auth"},
                {'label': 'Set default location', 'value': "geo"},
                {'label': 'Set default voice', 'value': "tts"},
@@ -434,8 +436,8 @@ def _backend_menu(view=False):
                {'label': 'Set default email', 'value': "email"},
                {'label': 'Set default date format', 'value': "date"},
                {'label': 'Set default time format', 'value': "time"},
-               {'label': 'Set default system units', 'value': "unit"},
-               {'label': 'Main Menu', 'value': "main"}]
+               {'label': 'Set default system units', 'value': "unit"}
+               ]
     if CONFIGURATION["override_location"]:
         buttons.insert(-2, {'label': 'Enable IP geolocation', 'value': "ip_geo"})
     else:
@@ -507,17 +509,17 @@ def _metrics_menu():
     db = JsonMetricDatabase()
     if not len(db):
         popup("No metrics uploaded yet!")
-        _main_menu()
+        _database_menu()
         return
 
     for m in db:
         name = f"{m['metric_id']}-{m['metric_type']}"
         buttons.append({'label': name, 'value': m['metric_id']})
-    buttons.append({'label': 'Main Menu', 'value': "main"})
+    buttons.insert(0, {'label': '<- Go Back', 'value': "main"})
     opt = actions(label="Select a metric to inspect",
                   buttons=buttons)
     if opt == "main":
-        _main_menu()
+        _database_menu()
         return
     # id == db_position + 1
     name = f"{opt}-{db[opt - 1]['metric_type']}"
@@ -531,17 +533,17 @@ def _ww_menu():
     db = JsonWakeWordDatabase()
     if not len(db):
         popup("No wake words uploaded yet!")
-        _main_menu()
+        _database_menu()
         return
 
     for m in db:
         name = f"{m['wakeword_id']}-{m['transcription']}"
         buttons.append({'label': name, 'value': m['wakeword_id']})
-    buttons.append({'label': 'Main Menu', 'value': "main"})
+    buttons.insert(0, {'label': '<- Go Back', 'value': "main"})
     opt = actions(label="Select a WakeWord recording",
                   buttons=buttons)
     if opt == "main":
-        _main_menu()
+        _database_menu()
         return
     # id == db_position + 1
     name = f"{opt}-{db[opt - 1]['transcription']}"
@@ -555,17 +557,17 @@ def _utt_menu():
     db = JsonUtteranceDatabase()
     if not len(db):
         popup("No utterances uploaded yet!")
-        _main_menu()
+        _database_menu()
         return
 
     for m in db:
         name = f"{m['utterance_id']}-{m['transcription']}"
         buttons.append({'label': name, 'value': m['utterance_id']})
-    buttons.append({'label': 'Main Menu', 'value': "main"})
+    buttons.insert(0, {'label': '<- Go Back', 'value': "main"})
     opt = actions(label="Select a Utterance recording",
                   buttons=buttons)
     if opt == "main":
-        _main_menu()
+        _database_menu()
         return
 
     # id == db_position + 1
@@ -577,14 +579,14 @@ def _utt_menu():
 
 def _database_menu():
     opt = actions(label="What would you like to do?",
-                  buttons=[{'label': 'View Metrics', 'value': "metrics"},
+                  buttons=[{'label': '<- Go Back', 'value': "main"},
+                           {'label': 'View Metrics', 'value': "metrics"},
                            {'label': 'View Wake Words', 'value': "ww"},
                            {'label': 'View Utterances', 'value': "utt"},
-                           {'label': 'Delete device database', 'value': "delete_devices"},
                            {'label': 'Delete metrics database', 'value': "delete_metrics"},
                            {'label': 'Delete wake words database', 'value': "delete_ww"},
-                           {'label': 'Delete utterances database', 'value': "delete_utts"},
-                   {'label': 'Main Menu', 'value': "main"}])
+                           {'label': 'Delete utterances database', 'value': "delete_utts"}
+                           ])
 
     if opt == "metrics":
         _metrics_menu()
@@ -592,17 +594,6 @@ def _database_menu():
         _ww_menu()
     if opt == "utt":
         _utt_menu()
-    if opt == "delete_devices":
-        with popup("Are you sure you want to delete the device database?"):
-            put_text("this can not be undone, proceed with caution!")
-            put_text("ALL devices will be unpaired")
-        opt = actions(label="Delete devices database?",
-                      buttons=[{'label': "yes", 'value': True},
-                               {'label': "no", 'value': False}])
-        if opt:
-            os.remove(DeviceDatabase().path)
-            _main_menu()
-            return
     if opt == "delete_metrics":
         with popup("Are you sure you want to delete the metrics database?"):
             put_text("this can not be undone, proceed with caution!")
@@ -613,7 +604,9 @@ def _database_menu():
         if opt:
             os.remove(JsonMetricDatabase().db.path)
             _main_menu()
-            return
+        else:
+            _database_menu()
+        return
     if opt == "delete_ww":
         with popup("Are you sure you want to delete the wake word database?"):
             put_text("this can not be undone, proceed with caution!")
@@ -625,7 +618,9 @@ def _database_menu():
             # TODO - also remove files from path
             os.remove(JsonWakeWordDatabase().db.path)
             _main_menu()
-            return
+        else:
+            _database_menu()
+        return
     if opt == "delete_utts":
         with popup("Are you sure you want to delete the utterance database?"):
             put_text("this can not be undone, proceed with caution!")
@@ -637,21 +632,42 @@ def _database_menu():
             # TODO - also remove files from path
             os.remove(JsonUtteranceDatabase().db.path)
             _main_menu()
-            return
+        else:
+            _database_menu()
+        return
     if opt == "main":
         _main_menu()
         return
     _database_menu()
 
 
-def _device_select():
+def _device_menu():
     devices = {uuid: f"{device['name']}@{device['device_location']}"
                for uuid, device in DeviceDatabase().items()}
+    buttons = [{'label': '<- Go Back', 'value': "main"}] + \
+              [{'label': d, 'value': uuid} for uuid, d in devices.items()] + \
+              [{'label': 'Delete device database', 'value': "delete_devices"}]
     if devices:
         uuid = actions(label="What device would you like to manage?",
-                       buttons=[{'label': d, 'value': uuid}
-                                for uuid, d in devices.items()])
-        _device_menu(uuid, view=True)
+                       buttons=buttons)
+        if uuid == "main":
+            _main_menu()
+            return
+        elif uuid == "delete_devices":
+            with popup("Are you sure you want to delete the device database?"):
+                put_text("this can not be undone, proceed with caution!")
+                put_text("ALL devices will be unpaired")
+            opt = actions(label="Delete devices database?",
+                          buttons=[{'label': "yes", 'value': True},
+                                   {'label': "no", 'value': False}])
+            if opt:
+                os.remove(DeviceDatabase().path)
+                _main_menu()
+            else:
+                _device_menu()
+            return
+        else:
+            _device_uuid_menu(uuid, view=True)
     else:
         popup("No devices paired yet!")
         _main_menu()
@@ -670,14 +686,14 @@ def _pair_device():
                 "accessToken": token,
                 "refreshToken": token}
 
-    _device_menu(uuid, view=True, identity=identity)
+    _device_uuid_menu(uuid, view=True, identity=identity)
 
 
 def _main_menu():
     opt = actions(label="What would you like to do?",
-                  buttons=[{'label': 'Manage a device', 'value': "device"},
-                           {'label': 'Pair a device', 'value': "pair"},
-                           {'label': 'Manage Databases', 'value': "db"},
+                  buttons=[{'label': 'Pair a device', 'value': "pair"},
+                           {'label': 'Manage Devices', 'value': "device"},
+                           {'label': 'Manage Datasets', 'value': "db"},
                            {'label': 'Configure Backend', 'value': "backend"},
                            {'label': 'Configure Microservices', 'value': "services"},
                            {'label': 'Configure Selene Proxy', 'value': "selene"}])
@@ -692,7 +708,7 @@ def _main_menu():
     elif opt == "selene":
         _selene_menu()
     elif opt == "device":
-        _device_select()
+        _device_menu()
 
 
 def _admin_auth():
