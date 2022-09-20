@@ -79,7 +79,7 @@ def _device_menu(uuid, view=False, identity=None):
                       buttons=[{'label': "View device configuration", 'value': "view"},
                                {'label': "View device identity", 'value': "identity"},
                                {'label': 'Change device name', 'value': "name"},
-                               {'label': 'Change indoor location', 'value': "location"},
+                               {'label': 'Change placement', 'value': "location"},
                                {'label': 'Change geographical location', 'value': "geo"},
                                {'label': 'Change wake word', 'value': "ww"},
                                {'label': 'Change voice', 'value': "tts"},
@@ -141,7 +141,7 @@ def _device_menu(uuid, view=False, identity=None):
                                 required=True)
                 device.name = name
             if opt == "location":
-                loc = textarea("Enter your device indoor location",
+                loc = textarea("Enter your device placement",
                                placeholder="kitchen",
                                required=True)
                 device.device_location = loc
