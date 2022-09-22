@@ -185,7 +185,7 @@ def ww_menu(back_handler=None):
             content = data["file"]["content"]
             if mime != "audio/x-wav":
                 popup("invalid format!")
-            # if mime in ["application/json"]:
+
             else:
                 os.makedirs(f"{CONFIGURATION['data_path']}/wakewords", exist_ok=True)
 
@@ -331,6 +331,7 @@ def datasets_menu(back_handler=None):
         ww_menu(back_handler=back_handler)
     if opt == "main":
         with use_scope("datasets", clear=True):
-            back_handler()
+            if back_handler:
+                back_handler()
         return
     datasets_menu(back_handler=back_handler)

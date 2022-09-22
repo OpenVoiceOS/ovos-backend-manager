@@ -34,7 +34,9 @@ def backend_menu(back_handler=None):
 
     opt = actions(label="What would you like to do?", buttons=buttons)
     if opt == "main":
-        back_handler()
+        with use_scope("main_view", clear=True):
+            if back_handler:
+                back_handler()
         return
     elif opt == "tts":
         tts = select("Choose a voice", list(CONFIGURATION["tts_configs"].keys()))

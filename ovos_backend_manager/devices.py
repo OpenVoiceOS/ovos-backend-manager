@@ -30,7 +30,7 @@ def device_menu(uuid, back_handler=None):
         buttons.insert(0, {'label': '<- Go Back', 'value': "main"})
 
     def update_info(d, l=False):
-        with use_scope("device", clear=True):
+        with use_scope("main_view", clear=True):
             if l:
                 put_markdown(f'### Geolocation:')
                 put_table([
@@ -65,7 +65,7 @@ def device_menu(uuid, back_handler=None):
                       buttons=buttons)
 
         if opt == "main":
-            with use_scope("device", clear=True):
+            with use_scope("main_view", clear=True):
                 device_select(back_handler)
             return
         if opt == "delete":
@@ -149,7 +149,7 @@ def device_menu(uuid, back_handler=None):
                         "expires_at": time.time() + 99999999999999,
                         "accessToken": device.token,
                         "refreshToken": device.token}
-            with use_scope("device", clear=True):
+            with use_scope("main_view", clear=True):
                 put_markdown(f'### identity2.json')
                 put_code(json.dumps(identity, indent=4), "json")
         else:
@@ -184,7 +184,7 @@ def device_select(back_handler=None):
         uuid = actions(label="What device would you like to manage?",
                        buttons=buttons)
         if uuid == "main":
-            with use_scope("device", clear=True):
+            with use_scope("main_view", clear=True):
                 if back_handler:
                     back_handler()
             return
@@ -197,7 +197,9 @@ def device_select(back_handler=None):
                                    {'label': "no", 'value': False}])
             if opt:
                 os.remove(DeviceDatabase().path)
-                back_handler()
+                with use_scope("main_view", clear=True):
+                    if back_handler:
+                        back_handler()
             else:
                 device_select(back_handler)
             return
@@ -206,8 +208,9 @@ def device_select(back_handler=None):
     else:
         popup("No devices paired yet!")
         if back_handler:
-            with use_scope("device", clear=True):
-                back_handler()
+            with use_scope("main_view", clear=True):
+                if back_handler:
+                    back_handler()
 
 
 def instant_pair(back_handler=None):
@@ -222,7 +225,7 @@ def instant_pair(back_handler=None):
     with DeviceDatabase() as db:
         db.add_device(uuid, token)
 
-    with use_scope("device", clear=True):
+    with use_scope("main_view", clear=True):
         put_markdown("# Device paired!")
         put_table([
             ['UUID', uuid],

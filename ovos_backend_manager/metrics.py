@@ -38,7 +38,7 @@ def metrics_select(back_handler=None, uuid=None):
     buttons = []
     db = JsonMetricDatabase()
     if not len(db):
-        with use_scope("charts", clear=True):
+        with use_scope("main_view", clear=True):
             put_text("No metrics uploaded yet!")
         metrics_menu(back_handler=back_handler)
         return
@@ -56,7 +56,7 @@ def metrics_select(back_handler=None, uuid=None):
         device_select(back_handler=back_handler)
         return
     # id == db_position + 1
-    with use_scope("charts", clear=True):
+    with use_scope("main_view", clear=True):
         put_markdown("# Metadata")
         put_code(json.dumps(db[opt - 1], indent=4), "json")
     metrics_select(back_handler=back_handler)
@@ -83,7 +83,7 @@ def metrics_menu(back_handler=None):
                   buttons=buttons)
     m = MetricsReportGenerator()
     if opt == "opt-in":
-        with use_scope("charts", clear=True):
+        with use_scope("main_view", clear=True):
             put_markdown(f"""
         # Open Dataset Report
 
@@ -98,7 +98,7 @@ def metrics_menu(back_handler=None):
             put_html(m.uploads_chart().render_notebook())
 
     if opt == "intents":
-        with use_scope("charts", clear=True):
+        with use_scope("main_view", clear=True):
             put_markdown(f"""
                     # Intent Matches Report
 
@@ -107,13 +107,13 @@ def metrics_menu(back_handler=None):
                     """)
             put_html(m.intent_type_chart().render_notebook())
     if opt == "stt":
-        with use_scope("charts", clear=True):
+        with use_scope("main_view", clear=True):
             put_html(m.stt_type_chart().render_notebook())
     if opt == "tts":
-        with use_scope("charts", clear=True):
+        with use_scope("main_view", clear=True):
             put_html(m.tts_type_chart().render_notebook())
     if opt == "types":
-        with use_scope("charts", clear=True):
+        with use_scope("main_view", clear=True):
             put_markdown(f"""
         # Metrics Report
         
@@ -124,7 +124,7 @@ def metrics_menu(back_handler=None):
         """)
             put_html(m.metrics_type_chart().render_notebook())
     if opt == "fallback":
-        with use_scope("charts", clear=True):
+        with use_scope("main_view", clear=True):
             f = 0
             if m.total_intents + m.total_fallbacks > 0:
                 f = m.total_intents / (m.total_intents + m.total_fallbacks)
@@ -149,13 +149,16 @@ def metrics_menu(back_handler=None):
                                {'label': "no", 'value': False}])
         if opt:
             os.remove(JsonMetricDatabase().db.path)
-            back_handler()
+            with use_scope("main_view", clear=True):
+                if back_handler:
+                    back_handler()
         else:
             metrics_menu(back_handler=back_handler)
         return
     if opt == "main":
-        with use_scope("charts", clear=True):
-            back_handler()
+        with use_scope("main_view", clear=True):
+            if back_handler:
+                back_handler()
         return
     metrics_menu(back_handler=back_handler)
 

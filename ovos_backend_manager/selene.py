@@ -1,67 +1,157 @@
 import os
 
 from ovos_local_backend.configuration import CONFIGURATION
-from pywebio.input import actions
-from pywebio.output import put_table, popup, use_scope, put_image
+from pywebio.input import actions, file_upload, input_group, textarea
+from pywebio.output import put_table, popup, use_scope, put_image, put_markdown, put_code
 
 
 def selene_menu(back_handler=None):
+    version = CONFIGURATION["selene"]["version"]
+    host = CONFIGURATION["selene"]["url"]
+    ident = CONFIGURATION["selene"]["identity_file"]
+    paired = os.path.exists(ident)
+
     with use_scope("logo", clear=True):
         img = open(f'{os.path.dirname(__file__)}/res/selene_proxy.png', 'rb').read()
         put_image(img)
 
-    if CONFIGURATION["selene"]["enabled"]:
-        buttons = [{'label': "View configuration", 'value': "view"},
-                   {'label': "Disable Selene", 'value': "selene"}]
+    with use_scope("main_view", clear=True):
+        put_markdown("# Status")
+        put_table([
+            ['Enabled', CONFIGURATION["selene"]["enabled"]],
+            ['Host', host],
+            ['Version', version],
+            ['Identity', ident],
+            ['Paired', paired],
+            ['Proxy Pairing Enabled', CONFIGURATION["selene"]["proxy_pairing"]]
+        ])
 
-        label = "Enable Proxy Pairing" if CONFIGURATION["selene"]["proxy_pairing"] else "Disable Proxy Pairing"
-        buttons.insert(-2, {'label': label, 'value': "proxy"})
-        label = "Enable Weather Proxy" if CONFIGURATION["selene"]["proxy_weather"] else "Disable Weather Proxy"
-        buttons.insert(-2, {'label': label, 'value': "weather"})
-        label = "Enable WolframAlpha Proxy" if CONFIGURATION["selene"][
+        put_markdown("# Microservices")
+        put_table([
+            ['Weather Enabled', CONFIGURATION["selene"]["proxy_weather"]],
+            ['WolframAlpha Enabled', CONFIGURATION["selene"]["proxy_wolfram"]],
+            ['Geolocation Enabled', CONFIGURATION["selene"]["proxy_geolocation"]],
+            ['Email Enabled', CONFIGURATION["selene"]["proxy_email"]]
+        ])
+
+        put_markdown("# Skills")
+        put_table([
+            ['Download Location', CONFIGURATION["selene"]["download_location"]],
+            ['Download Preferences', CONFIGURATION["selene"]["download_prefs"]],
+            ['Download Skill Settings', CONFIGURATION["selene"]["download_settings"]],
+            ['Upload Skill Settings', CONFIGURATION["selene"]["upload_settings"]],
+            ['Force 2 way Skill Settings sync', CONFIGURATION["selene"]["force2way"]]
+        ])
+
+        put_markdown("# Open Dataset")
+        put_table([
+            ['Opt In', CONFIGURATION["selene"]["opt_in"]],
+            ['Upload Metrics', CONFIGURATION["selene"]["upload_metrics"]],
+            ['Upload Wake Words', CONFIGURATION["selene"]["upload_wakewords"]],
+            ['Upload Utterances', CONFIGURATION["selene"]["upload_utterances"]]
+        ])
+
+    if CONFIGURATION["selene"]["enabled"]:
+        buttons = [{'label': "Disable Selene", 'value': "selene"},
+                   {'label': 'Upload identity2.json', 'value': "upload"},
+                   {'label': 'Paste identity2.json', 'value': "paste"}]
+
+        if os.path.isfile(ident):
+            buttons.insert(1, {'label': "View identity2.json", 'value': "view"})
+            buttons.insert(2, {'label': 'Delete identity2.json', 'value': "delete"})
+
+        label = "Enable Proxy Pairing" if not CONFIGURATION["selene"]["proxy_pairing"] else "Disable Proxy Pairing"
+        buttons.insert(-1, {'label': label, 'value': "proxy"})
+        label = "Enable Weather Proxy" if not CONFIGURATION["selene"]["proxy_weather"] else "Disable Weather Proxy"
+        buttons.insert(-1, {'label': label, 'value': "weather"})
+        label = "Enable WolframAlpha Proxy" if not CONFIGURATION["selene"][
             "proxy_wolfram"] else "Disable WolframAlpha Proxy"
-        buttons.insert(-2, {'label': label, 'value': "wolfram"})
-        label = "Enable Geolocation Proxy" if CONFIGURATION["selene"][
+        buttons.insert(-1, {'label': label, 'value': "wolfram"})
+        label = "Enable Geolocation Proxy" if not CONFIGURATION["selene"][
             "proxy_geolocation"] else "Disable Geolocation Proxy"
-        buttons.insert(-2, {'label': label, 'value': "geolocation"})
-        label = "Enable Email Proxy" if CONFIGURATION["selene"]["proxy_email"] else "Disable Email Proxy"
-        buttons.insert(-2, {'label': label, 'value': "email"})
-        label = "Enable Location Download" if CONFIGURATION["selene"][
+        buttons.insert(-1, {'label': label, 'value': "geolocation"})
+        label = "Enable Email Proxy" if not CONFIGURATION["selene"]["proxy_email"] else "Disable Email Proxy"
+        buttons.insert(-1, {'label': label, 'value': "email"})
+        label = "Enable Location Download" if not CONFIGURATION["selene"][
             "download_location"] else "Disable Location Download"
-        buttons.insert(-2, {'label': label, 'value': "location"})
-        label = "Enable Preferences Download" if CONFIGURATION["selene"][
+        buttons.insert(-1, {'label': label, 'value': "location"})
+        label = "Enable Preferences Download" if not CONFIGURATION["selene"][
             "download_prefs"] else "Disable Preferences Download"
-        buttons.insert(-2, {'label': label, 'value': "prefs"})
+        buttons.insert(-1, {'label': label, 'value': "prefs"})
         label = "Enable SkillSettings Download" if CONFIGURATION["selene"][
             "download_settings"] else "Disable SkillSettings Download"
-        buttons.insert(-2, {'label': label, 'value': "download_settings"})
-        label = "Enable SkillSettings Upload" if CONFIGURATION["selene"][
+        buttons.insert(-1, {'label': label, 'value': "download_settings"})
+        label = "Enable SkillSettings Upload" if not CONFIGURATION["selene"][
             "upload_settings"] else "Disable SkillSettings Upload"
-        buttons.insert(-2, {'label': label, 'value': "upload_settings"})
-        label = "Enable forced 2way sync" if CONFIGURATION["selene"]["force2way"] else "Disable forced 2way sync"
-        buttons.insert(-2, {'label': label, 'value': "2way"})
-        label = "Enable Open Dataset Opt In" if CONFIGURATION["selene"]["opt_in"] else "Disable Open Dataset Opt In"
-        buttons.insert(-2, {'label': label, 'value': "opt_in"})
-        label = "Enable Metrics Upload" if CONFIGURATION["selene"]["upload_metrics"] else "Disable Metrics Upload"
-        buttons.insert(-2, {'label': label, 'value': "metrics"})
-        label = "Enable Wake Words Upload" if CONFIGURATION["selene"][
+        buttons.insert(-1, {'label': label, 'value': "upload_settings"})
+        label = "Enable forced 2way sync" if not CONFIGURATION["selene"]["force2way"] else "Disable forced 2way sync"
+        buttons.insert(-1, {'label': label, 'value': "2way"})
+        label = "Enable Open Dataset Opt In" if not CONFIGURATION["selene"]["opt_in"] else "Disable Open Dataset Opt In"
+        buttons.insert(-1, {'label': label, 'value': "opt_in"})
+        label = "Enable Metrics Upload" if not CONFIGURATION["selene"]["upload_metrics"] else "Disable Metrics Upload"
+        buttons.insert(-1, {'label': label, 'value': "metrics"})
+        label = "Enable Wake Words Upload" if not CONFIGURATION["selene"][
             "upload_wakewords"] else "Disable Wake Words Upload"
-        buttons.insert(-2, {'label': label, 'value': "ww"})
-        label = "Enable Utterances Upload" if CONFIGURATION["selene"][
+        buttons.insert(-1, {'label': label, 'value': "ww"})
+        label = "Enable Utterances Upload" if not CONFIGURATION["selene"][
             "upload_utterances"] else "Disable Utterances Upload"
-        buttons.insert(-2, {'label': label, 'value': "stt"})
+        buttons.insert(-1, {'label': label, 'value': "stt"})
 
     else:
-        buttons = [{'label': "View configuration", 'value': "view"},
-                   {'label': "Enable Selene", 'value': "selene"}]
+        buttons = [
+            {'label': "Enable Selene", 'value': "selene"},
+            {'label': 'Upload identity2.json', 'value': "upload"},
+            {'label': 'Paste identity2.json', 'value': "paste"},
+        ]
+        if os.path.isfile(ident):
+            buttons.insert(1, {'label': "View identity2.json", 'value': "view"})
+            buttons.insert(2, {'label': 'Delete identity2.json', 'value': "delete"})
 
     if back_handler:
         buttons.insert(0, {'label': '<- Go Back', 'value': "main"})
 
     opt = actions(label="What would you like to do?", buttons=buttons)
     if opt == "main":
-        back_handler()
+        with use_scope("main_view", clear=True):
+            if back_handler:
+                back_handler()
         return
+    elif opt == "delete":
+        with use_scope("main_view", clear=True):
+            if os.path.isfile(ident):
+                os.remove(ident)
+                popup("Identity deleted!")
+            else:
+                popup("Identity does not exist!")
+    elif opt == "upload":
+        with use_scope("main_view", clear=True):
+            data = input_group("Upload identity", [
+                file_upload("identity file", name="file")
+            ])
+            mime = data["file"]["mime_type"]
+            content = data["file"]["content"]
+            if mime != "application/json":
+                popup("invalid format!")
+            else:
+                os.makedirs(os.path.dirname(ident), exist_ok=True)
+                with open(ident, "wb") as f:
+                    f.write(content)
+                with popup("Identity uploaded!"):
+                    put_code(content.decode("utf-8"), "json")
+    elif opt == "paste":
+        with use_scope("main_view", clear=True):
+            dummy = """{
+    "uuid": "31628fa1-dbfd-4626-aaa2-1464dd204715",
+    "expires_at": 100001663862051.53,
+    "accessToken": "8YI3NQ:31628fa1-dbfd-4626-aaa2-1464dd204715",
+    "refreshToken": "8YI3NQ:31628fa1-dbfd-4626-aaa2-1464dd204715"
+}
+"""
+            data = textarea("identity2.json", placeholder=dummy, required=True)
+            with open(ident, "w") as f:
+                f.write(data)
+            with popup("Identity updated!"):
+                put_code(data, "json")
     elif opt == "geolocation":
         CONFIGURATION["selene"]["proxy_geolocation"] = not CONFIGURATION["selene"]["proxy_geolocation"]
     elif opt == "weather":
@@ -93,27 +183,11 @@ def selene_menu(back_handler=None):
     elif opt == "metrics":
         CONFIGURATION["selene"]["upload_metrics"] = not CONFIGURATION["selene"]["upload_metrics"]
     if opt == "view":
-        with popup("Selene Proxy Configuration"):
-            put_table([
-                ['Enabled', CONFIGURATION["selene"]["enabled"]],
-                ['Host', CONFIGURATION["selene"]["url"]],
-                ['Version', CONFIGURATION["selene"]["version"]],
-                ['Identity', CONFIGURATION["selene"]["identity_file"]],
-                ['Proxy Pairing Enabled', CONFIGURATION["selene"]["proxy_pairing"]],
-                ['Proxy Weather', CONFIGURATION["selene"]["proxy_weather"]],
-                ['Proxy WolframAlpha', CONFIGURATION["selene"]["proxy_wolfram"]],
-                ['Proxy Geolocation', CONFIGURATION["selene"]["proxy_geolocation"]],
-                ['Proxy Email', CONFIGURATION["selene"]["proxy_email"]],
-                ['Download Location', CONFIGURATION["selene"]["download_location"]],
-                ['Download Preferences', CONFIGURATION["selene"]["download_prefs"]],
-                ['Download Skill Settings', CONFIGURATION["selene"]["download_settings"]],
-                ['Upload Skill Settings', CONFIGURATION["selene"]["upload_settings"]],
-                ['Force 2 way Skill Settings sync', CONFIGURATION["selene"]["force2way"]],
-                ['OpenDataset opt in', CONFIGURATION["selene"]["opt_in"]],
-                ['Upload Metrics', CONFIGURATION["selene"]["upload_metrics"]],
-                ['Upload Wake Words', CONFIGURATION["selene"]["upload_wakewords"]],
-                ['Upload Utterances', CONFIGURATION["selene"]["upload_utterances"]]
-            ])
+        with popup("identity2.json"):
+            with open(ident) as f:
+                content = f.read()
+            put_code(content, "json")
+
     else:
         CONFIGURATION.store()
 
