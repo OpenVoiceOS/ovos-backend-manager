@@ -75,6 +75,7 @@ def metrics_menu(back_handler=None, uuid=None):
                {'label': 'FallbackSkill', 'value': "fallback"},
                {'label': 'STT', 'value': "stt"},
                {'label': 'TTS', 'value': "tts"},
+               {'label': 'Wake Words', 'value': "ww"},
                {'label': 'Open Dataset', 'value': "opt-in"}]
     if uuid is not None:
         buttons.append({'label': 'Delete Device metrics', 'value': "delete_metrics"})
@@ -114,17 +115,40 @@ def metrics_menu(back_handler=None, uuid=None):
 
     if opt == "intents":
         with use_scope("main_view", clear=True):
+            txt_estimate = max(m.total_intents + m.total_fallbacks - m.total_stt, 0)
+            stt_estimate = max(m.total_intents + m.total_fallbacks - txt_estimate, 0)
             if uuid is not None:
                 put_markdown(f"\nDevice: {uuid}")
             md = f"""# Intent Matches Report
             Total queries: {m.total_intents + m.total_fallbacks}
-            Total Intents: {m.total_intents}"""
+            
+            Total text queries (estimate): {txt_estimate}
+            Total speech queries (estimate): {stt_estimate}
+            
+            Total Matches: {m.total_intents}"""
             put_markdown(md)
             put_html(m.intent_type_chart().render_notebook())
-    if opt == "stt":
+    if opt == "ww":
+        bad = max(0, m.total_stt - m.total_ww)
+        silents = max(0, m.total_stt - m.total_utt)
         with use_scope("main_view", clear=True):
             if uuid is not None:
-                put_markdown(f"\nDevice: {uuid}")
+                put_markdown(f"\nDevice: {uuid}\n\n")
+            put_markdown(f"""Total WakeWord uploads: {m.total_ww}
+            
+            Total WakeWord detections (estimate): {m.total_stt}
+            False Activations (estimate): {bad or silents}
+            Silent Activations (estimate): {silents}""")
+            # put_html(m.ww_type_chart().render_notebook())
+    if opt == "stt":
+        silents = max(0, m.total_stt - m.total_utt)
+        with use_scope("main_view", clear=True):
+            if uuid is not None:
+                put_markdown(f"\nDevice: {uuid}\n\n")
+            put_markdown(f"""Total Transcriptions: {m.total_stt}
+            Total Recording uploads: {m.total_utt}
+            
+            Silent Activations (estimate): {silents}""")
             put_html(m.stt_type_chart().render_notebook())
     if opt == "tts":
         with use_scope("main_view", clear=True):
@@ -158,7 +182,7 @@ def metrics_menu(back_handler=None, uuid=None):
                         Total Intents: {m.total_intents}
                         Total Fallbacks: {m.total_fallbacks}
 
-                        Failure Percentage: {1 - f}
+                        Failure Percentage (estimate): {1 - f}
                         """)
             put_html(m.fallback_type_chart().render_notebook())
     if opt == "metrics":
