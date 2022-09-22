@@ -6,6 +6,7 @@ from ovos_backend_manager.backend import backend_menu
 from ovos_backend_manager.datasets import datasets_menu
 from ovos_backend_manager.devices import device_select, instant_pair
 from ovos_backend_manager.microservices import microservices_menu
+from ovos_backend_manager.metrics import metrics_menu
 from ovos_backend_manager.selene import selene_menu
 
 
@@ -13,6 +14,7 @@ def main_menu():
     opt = actions(label="What would you like to do?",
                   buttons=[{'label': 'Pair a device', 'value': "pair"},
                            {'label': 'Manage Devices', 'value': "device"},
+                           {'label': 'Manage Metrics', 'value': "metrics"},
                            {'label': 'Manage Datasets', 'value': "db"},
                            {'label': 'Configure Backend', 'value': "backend"},
                            {'label': 'Configure Microservices', 'value': "services"},
@@ -29,6 +31,8 @@ def main_menu():
         selene_menu(back_handler=main_menu)
     elif opt == "device":
         device_select(back_handler=main_menu)
+    elif opt == "metrics":
+        metrics_menu(back_handler=main_menu)
 
 
 def prompt_admin_key():

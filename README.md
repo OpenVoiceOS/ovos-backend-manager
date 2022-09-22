@@ -14,7 +14,7 @@ or from source
 
 ## Usage
 
-It needs to run on the same machine, it directly interacts with the backend database and configuration files
+It needs to run on the same machine as the backend, it directly interacts with the databases and configuration files
 
 `ovos-backend-manager` will be available in the command line after installing
 
@@ -24,5 +24,4 @@ It needs to run on the same machine, it directly interacts with the backend data
 ![](./screenshots/Screenshot%202022-09-20%20at%2013-41-59%20PyWebIO%20Application.png)
 ![](./screenshots/Screenshot%202022-09-20%20at%2013-41-48%20PyWebIO%20Application.png)
 ![](./screenshots/Screenshot%202022-09-20%20at%2013-43-47%20PyWebIO%20Application.png)
-![](./screenshots/Screenshot%202022-09-20%20at%2013-40-52%20PyWebIO%20Application.png)
 ![](./screenshots/Screenshot%202022-09-20%20at%2013-41-09%20PyWebIO%20Application.png)
