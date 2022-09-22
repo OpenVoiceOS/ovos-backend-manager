@@ -80,7 +80,7 @@ def metrics_menu(back_handler=None):
     if opt == "opt-in":
         with use_scope("charts", clear=True):
             put_markdown(f"""
-        # Opt-In Report
+        # Open Dataset Report
 
         Total Registered Devices: {len(DeviceDatabase())}
         Currently Opted-in: {len([d for d in DeviceDatabase() if d.opt_in])}

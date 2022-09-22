@@ -1,11 +1,13 @@
 import json
 import os
+import time
 
+from ovos_local_backend.configuration import CONFIGURATION
 from ovos_local_backend.database.settings import DeviceDatabase
 from ovos_local_backend.database.utterances import JsonUtteranceDatabase
 from ovos_local_backend.database.wakewords import JsonWakeWordDatabase
-from pywebio.input import actions
-from pywebio.output import put_text, put_code, use_scope, put_markdown
+from pywebio.input import actions, file_upload, input_group, textarea
+from pywebio.output import put_text, put_code, use_scope, put_markdown, popup
 
 
 def ww_select(back_handler=None, uuid=None):
@@ -78,7 +80,8 @@ def utt_select(back_handler=None, uuid=None):
 def device_select(back_handler=None, ww=True):
     devices = {uuid: f"{device['name']}@{device['device_location']}"
                for uuid, device in DeviceDatabase().items()}
-    buttons = [{'label': "All Devices", 'value': "all"}] + \
+    buttons = [{'label': "All Devices", 'value': "all"},
+               {'label': "Unknown Devices", 'value': "AnonDevice"}] + \
               [{'label': d, 'value': uuid} for uuid, d in devices.items()]
     if back_handler:
         buttons.insert(0, {'label': '<- Go Back', 'value': "main"})
@@ -107,6 +110,7 @@ def device_select(back_handler=None, ww=True):
 
 def ww_menu(back_handler=None):
     buttons = [{'label': 'Inspect Wake Words', 'value': "ww"},
+               {'label': 'Upload Wake Word', 'value': "upload"},
                {'label': 'Delete wake words database', 'value': "delete_ww"}]
     if back_handler:
         buttons.insert(0, {'label': '<- Go Back', 'value': "main"})
@@ -115,6 +119,48 @@ def ww_menu(back_handler=None):
                   buttons=buttons)
     if opt == "ww":
         device_select(back_handler=back_handler, ww=True)
+    if opt == "upload":
+        with use_scope("datasets", clear=True):
+            data = input_group("Upload wake word", [
+                textarea("wake word name", placeholder="hey mycroft", required=True, name="name"),
+                file_upload("wake word recording", name="file")
+            ])
+
+            name = data["name"]
+            filename = data["file"]["filename"]
+            mime = data["file"]["mime_type"]
+            content = data["file"]["content"]
+            if mime != "audio/x-wav":
+                popup("invalid format!")
+            # if mime in ["application/json"]:
+            else:
+                os.makedirs(f"{CONFIGURATION['data_path']}/wakewords", exist_ok=True)
+
+                uuid = "AnonDevice"  # TODO - allow tagging to a device
+                wav_path = f"{CONFIGURATION['data_path']}/wakewords/{name}.{filename}"
+                meta_path = f"{CONFIGURATION['data_path']}/wakewords/{name}.{filename}.meta"
+                meta = {
+                    "transcription": name,
+                    "path": wav_path,
+                    "meta": {
+                        "name": name,
+                        "time": time.time(),
+                        "accountId": "0",
+                        "sessionId": "0",
+                        "model": "uploaded_file",
+                        "engine": "uploaded_file"
+                    },
+                    "uuid": uuid
+                }
+                with JsonWakeWordDatabase() as db:
+                    db.add_wakeword(name, wav_path, meta, uuid)
+                with open(wav_path, "wb") as f:
+                    f.write(content)
+                with open(meta_path, "w") as f:
+                    json.dump(meta, f)
+                with popup("wake word uploaded!"):
+                    put_code(json.dumps(meta, indent=4), "json")
+
     if opt == "delete_ww":
         with use_scope("datasets", clear=True):
             put_markdown("""Are you sure you want to delete the wake word database?
@@ -139,6 +185,7 @@ def ww_menu(back_handler=None):
 
 def utt_menu(back_handler=None):
     buttons = [{'label': 'Inspect Recordings', 'value': "utt"},
+               {'label': 'Upload Utterance', 'value': "upload"},
                {'label': 'Delete utterances database', 'value': "delete_utt"}]
     if back_handler:
         buttons.insert(0, {'label': '<- Go Back', 'value': "main"})
@@ -147,6 +194,40 @@ def utt_menu(back_handler=None):
                   buttons=buttons)
     if opt == "utt":
         device_select(back_handler=back_handler, ww=False)
+    if opt == "upload":
+        with use_scope("datasets", clear=True):
+            data = input_group("Upload utterance", [
+                textarea("transcript", placeholder="hello world", required=True, name="utterance"),
+                file_upload("speech recording", name="file")
+            ])
+
+            utterance = data["utterance"]
+            filename = data["file"]["filename"]
+            mime = data["file"]["mime_type"]
+            content = data["file"]["content"]
+            if mime != "audio/x-wav":
+                popup("invalid format!")
+            # if mime in ["application/json"]:
+            else:
+                os.makedirs(f"{CONFIGURATION['data_path']}/utterances", exist_ok=True)
+
+                uuid = "AnonDevice"  # TODO - allow tagging to a device
+                path = f"{CONFIGURATION['data_path']}/utterances/{utterance}.{filename}"
+
+                meta = {
+                    "transcription": utterance,
+                    "path": path,
+                    "uuid": uuid
+                }
+                with JsonUtteranceDatabase() as db:
+                    db.add_utterance(utterance, path, uuid)
+
+                with open(path, "wb") as f:
+                    f.write(content)
+
+                with popup("utterance recording uploaded!"):
+                    put_code(json.dumps(meta, indent=4), "json")
+
     if opt == "delete_utt":
         with use_scope("datasets", clear=True):
             put_markdown("""Are you sure you want to delete the utterances database?
