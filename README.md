@@ -4,11 +4,19 @@ a simple UI for [OVOS-local-backend](https://github.com/OpenVoiceOS/OVOS-local-b
 
 ![](./screenshots/demo.gif)
 
+## Install
+
+`pip install ovos-backend-manager`
+
+or from source
+
+`pip install git+https://github.com/OpenVoiceOS/ovos-personal-backend-ui`
+
 ## Usage
 
 It needs to run on the same machine, it directly interacts with the backend database and configuration files
 
-run app.py
+`ovos-backend-manager` will be available in the command line after installing
 
 ## Screenshots
 
