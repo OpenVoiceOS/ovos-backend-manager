@@ -8,11 +8,12 @@ from ovos_local_backend.database.settings import DeviceDatabase
 from ovos_local_backend.utils import generate_code
 from ovos_local_backend.utils.geolocate import get_location_config
 from pywebio.input import textarea, select, actions, checkbox
-from pywebio.output import put_text, put_table, put_markdown, popup, put_code
+from pywebio.output import put_text, put_table, put_markdown, popup, put_code, use_scope
 
 
 def device_menu(uuid, back_handler=None):
     buttons = [{'label': "View device configuration", 'value': "view"},
+               {'label': "View device location", 'value': "view_loc"},
                {'label': "View device identity", 'value': "identity"},
                {'label': 'Change device name', 'value': "name"},
                {'label': 'Change placement', 'value': "location"},
@@ -27,13 +28,43 @@ def device_menu(uuid, back_handler=None):
                {'label': 'Delete device', 'value': "delete"}]
     if back_handler:
         buttons.insert(0, {'label': '<- Go Back', 'value': "main"})
+
+    def update_info(d, l=False):
+        with use_scope("device", clear=True):
+            if l:
+                put_markdown(f'### Geolocation:')
+                put_table([
+                    ['City', d.location["city"]["name"]],
+                    ['State', d.location["city"]["state"]["name"]],
+                    ['Country', d.location["city"]["state"]["country"]["name"]],
+                    ['Country Code', d.location["city"]["state"]["country"]["code"]],
+                    ['Latitude', d.location["coordinate"]["latitude"]],
+                    ['Longitude', d.location["coordinate"]["longitude"]],
+                    ['Timezone Code', d.location["timezone"]["code"]]
+                ])
+            else:
+                put_markdown(f'### Configuration:')
+                put_table([
+                    ['Name', d.name],
+                    ['Location', d.device_location],
+                    ['Email', d.email],
+                    ['Date Format', d.date_format],
+                    ['Time Format', d.time_format],
+                    ['System Unit', d.system_unit],
+                    ['Opt In', d.opt_in],
+                    ['Lang', d.lang],
+                    ['Default Wake Word', d.default_ww],
+                    ['Default Voice', d.default_tts]
+                ])
+
     device = DeviceDatabase().get_device(uuid)
     if device:
         opt = actions(label="What would you like to do?",
                       buttons=buttons)
         with DeviceDatabase() as db:
             if opt == "main":
-                device_select(back_handler)
+                with use_scope("device", clear=True):
+                    device_select(back_handler)
                 return
             if opt == "delete":
                 with popup("Are you sure you want to delete the device?"):
@@ -93,6 +124,7 @@ def device_menu(uuid, back_handler=None):
                                placeholder="kitchen",
                                required=True)
                 device.device_location = loc
+
             if opt == "geo":
                 loc = textarea("Enter an address",
                                placeholder="Anywhere street Any city Nº234",
@@ -105,37 +137,17 @@ def device_menu(uuid, back_handler=None):
                             "expires_at": time.time() + 99999999999999,
                             "accessToken": device.token,
                             "refreshToken": device.token}
-                with popup(f'UUID: {device.uuid}'):
+                with use_scope("device", clear=True):
                     put_markdown(f'### identity2.json')
                     put_code(json.dumps(identity, indent=4), "json")
-            elif opt == "view":
-                with popup(f'UUID: {device.uuid}'):
-                    put_markdown(f'### Device Data:')
-                    put_table([
-                        ['Name', device.name],
-                        ['Location', device.device_location],
-                        ['Email', device.email],
-                        ['Date Format', device.date_format],
-                        ['Time Format', device.time_format],
-                        ['System Unit', device.system_unit],
-                        ['Opt In', device.opt_in],
-                        ['Lang', device.lang],
-                        ['Default Wake Word', device.default_ww],
-                        ['Default Voice', device.default_tts]
-                    ])
-                    put_markdown(f'### Geolocation:')
-                    put_table([
-                        ['City', device.location["city"]["name"]],
-                        ['State', device.location["city"]["state"]["name"]],
-                        ['Country', device.location["city"]["state"]["country"]["name"]],
-                        ['Country Code', device.location["city"]["state"]["country"]["code"]],
-                        ['Latitude', device.location["coordinate"]["latitude"]],
-                        ['Longitude', device.location["coordinate"]["longitude"]],
-                        ['Timezone Code', device.location["timezone"]["code"]]
-                    ])
             else:
+                if opt == "view_loc" or opt == "geo":
+                    update_info(device, True)
+                else:
+                    update_info(device, False)
                 db.update_device(device)
-                popup("Device updated!")
+                if not opt.startswith("view"):
+                    popup("Device updated!")
 
         device_menu(uuid, back_handler=back_handler)
     else:
@@ -155,7 +167,8 @@ def device_select(back_handler=None):
         uuid = actions(label="What device would you like to manage?",
                        buttons=buttons)
         if uuid == "main":
-            back_handler()
+            with use_scope("device", clear=True):
+                back_handler()
             return
         elif uuid == "delete_devices":
             with popup("Are you sure you want to delete the device database?"):

@@ -10,16 +10,43 @@ from pywebio.input import actions
 from pywebio.output import put_text, popup, put_code, put_markdown, put_html, use_scope
 
 
-def metrics_select(back_handler=None):
+def device_select(back_handler=None):
+    devices = {uuid: f"{device['name']}@{device['device_location']}"
+               for uuid, device in DeviceDatabase().items()}
+    buttons = [{'label': "All Devices", 'value': "all"}] + \
+              [{'label': d, 'value': uuid} for uuid, d in devices.items()]
+    if back_handler:
+        buttons.insert(0, {'label': '<- Go Back', 'value': "main"})
+
+    if devices:
+        uuid = actions(label="What device would you like to inspect?",
+                       buttons=buttons)
+        if uuid == "main":
+            back_handler()
+            return
+        else:
+            if uuid == "all":
+                uuid = None
+            metrics_select(uuid=uuid, back_handler=back_handler)
+    else:
+        popup("No devices paired yet!")
+        if back_handler:
+            back_handler()
+
+
+def metrics_select(back_handler=None, uuid=None):
     buttons = []
     db = JsonMetricDatabase()
     if not len(db):
-        popup("No metrics uploaded yet!")
+        with use_scope("charts", clear=True):
+            put_text("No metrics uploaded yet!")
         metrics_menu(back_handler=back_handler)
         return
 
     for m in db:
         name = f"{m['metric_id']}-{m['metric_type']}"
+        if uuid is not None and m["uuid"] != uuid:
+            continue
         buttons.append({'label': name, 'value': m['metric_id']})
     if back_handler:
         buttons.insert(0, {'label': '<- Go Back', 'value': "main"})
@@ -29,8 +56,8 @@ def metrics_select(back_handler=None):
         metrics_menu(back_handler=back_handler)
         return
     # id == db_position + 1
-    name = f"{opt}-{db[opt - 1]['metric_type']}"
-    with popup(name):
+    with use_scope("charts", clear=True):
+        put_markdown("# Metadata")
         put_code(json.dumps(db[opt - 1], indent=4), "json")
     metrics_select(back_handler=back_handler)
 
@@ -42,7 +69,7 @@ def metrics_menu(back_handler=None):
                {'label': 'STT', 'value': "stt"},
                {'label': 'TTS', 'value': "tts"},
                {'label': 'Open Dataset', 'value': "opt-in"},
-               {'label': 'Inspect Metrics', 'value': "metrics"},
+               {'label': 'Inspect Device Metrics', 'value': "metrics"},
                {'label': 'Delete metrics database', 'value': "delete_metrics"}
                ]
     if back_handler:
@@ -65,6 +92,7 @@ def metrics_menu(back_handler=None):
         Total Utterances submitted: {len(JsonUtteranceDatabase())} 
         """)
             put_html(m.uploads_chart().render_notebook())
+
     if opt == "intents":
         with use_scope("charts", clear=True):
             put_markdown(f"""
@@ -107,7 +135,7 @@ def metrics_menu(back_handler=None):
                         """)
             put_html(m.fallback_type_chart().render_notebook())
     if opt == "metrics":
-        metrics_select(back_handler=back_handler)
+        device_select(back_handler=back_handler)
     if opt == "delete_metrics":
         with popup("Are you sure you want to delete the metrics database?"):
             put_text("this can not be undone, proceed with caution!")
