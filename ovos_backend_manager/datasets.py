@@ -14,7 +14,7 @@ def ww_select(back_handler=None, uuid=None, ww=None):
     buttons = []
     db = JsonWakeWordDatabase()
     if not len(db):
-        with use_scope("datasets", clear=True):
+        with use_scope("main_view", clear=True):
             put_text("No wake words uploaded yet!")
         datasets_menu(back_handler=back_handler)
         return
@@ -28,7 +28,7 @@ def ww_select(back_handler=None, uuid=None, ww=None):
         buttons.append({'label': name, 'value': m['wakeword_id']})
 
     if len(buttons) == 0:
-        with use_scope("datasets", clear=True):
+        with use_scope("main_view", clear=True):
             put_text("No wake words uploaded from this device yet!")
         opt = "main"
     else:
@@ -40,7 +40,7 @@ def ww_select(back_handler=None, uuid=None, ww=None):
         ww_menu(back_handler=back_handler)
         return
     # id == db_position + 1
-    with use_scope("datasets", clear=True):
+    with use_scope("main_view", clear=True):
         put_code(json.dumps(db[opt - 1], indent=4), "json")
     ww_select(back_handler=back_handler, ww=ww, uuid=uuid)
 
@@ -49,7 +49,7 @@ def utt_select(back_handler=None, uuid=None, utt=None):
     buttons = []
     db = JsonUtteranceDatabase()
     if not len(db):
-        with use_scope("datasets", clear=True):
+        with use_scope("main_view", clear=True):
             put_text("No utterances uploaded yet!")
         datasets_menu(back_handler=back_handler)
         return
@@ -63,7 +63,7 @@ def utt_select(back_handler=None, uuid=None, utt=None):
         buttons.append({'label': name, 'value': m['utterance_id']})
 
     if len(buttons) == 0:
-        with use_scope("datasets", clear=True):
+        with use_scope("main_view", clear=True):
             put_text("No utterances uploaded from this device yet!")
         opt = "main"
     else:
@@ -76,7 +76,7 @@ def utt_select(back_handler=None, uuid=None, utt=None):
         return
 
     # id == db_position + 1
-    with use_scope("datasets", clear=True):
+    with use_scope("main_view", clear=True):
         put_code(json.dumps(db[opt - 1], indent=4), "json")
     utt_select(back_handler=back_handler, uuid=uuid, utt=utt)
 
@@ -104,7 +104,7 @@ def device_select(back_handler=None, ww=True):
             else:
                 utt_select(uuid=uuid, back_handler=back_handler)
     else:
-        with use_scope("datasets", clear=True):
+        with use_scope("main_view", clear=True):
             put_text("No devices paired yet!")
         if ww:
             ww_menu(back_handler=back_handler)
@@ -128,7 +128,7 @@ def ww_opts(back_handler=None, uuid=None):
             ww = None
         ww_select(ww=ww, back_handler=back_handler, uuid=uuid)
     else:
-        with use_scope("datasets", clear=True):
+        with use_scope("main_view", clear=True):
             put_text("No wake words uploaded yet!")
         ww_menu(back_handler=back_handler)
 
@@ -149,7 +149,7 @@ def utt_opts(back_handler=None, uuid=None):
             utt = None
         utt_select(utt=utt, back_handler=back_handler, uuid=uuid)
     else:
-        with use_scope("datasets", clear=True):
+        with use_scope("main_view", clear=True):
             put_text("No recordings uploaded yet!")
         utt_menu(back_handler=back_handler)
 
@@ -173,7 +173,7 @@ def ww_menu(back_handler=None):
     if opt == "ww":
         ww_opts(back_handler=back_handler)
     if opt == "upload":
-        with use_scope("datasets", clear=True):
+        with use_scope("main_view", clear=True):
             data = input_group("Upload wake word", [
                 textarea("wake word name", placeholder="hey mycroft", required=True, name="name"),
                 file_upload("wake word recording", name="file")
@@ -215,7 +215,7 @@ def ww_menu(back_handler=None):
                     put_code(json.dumps(meta, indent=4), "json")
 
     if opt == "delete_ww":
-        with use_scope("datasets", clear=True):
+        with use_scope("main_view", clear=True):
             put_markdown("""Are you sure you want to delete the wake word database?
             **this can not be undone**, proceed with caution!
             **ALL** wake word recordings will be **lost**""")
@@ -225,12 +225,12 @@ def ww_menu(back_handler=None):
         if opt:
             # TODO - also remove files from path
             os.remove(JsonWakeWordDatabase().db.path)
-            with use_scope("datasets", clear=True):
+            with use_scope("main_view", clear=True):
                 put_text("wake word database deleted!")
         datasets_menu(back_handler=back_handler)
         return
     if opt == "main":
-        with use_scope("datasets", clear=True):
+        with use_scope("main_view", clear=True):
             datasets_menu(back_handler=back_handler)
         return
     ww_menu(back_handler=back_handler)
@@ -255,7 +255,7 @@ def utt_menu(back_handler=None):
     if opt == "utt":
         utt_opts(back_handler=back_handler)
     if opt == "upload":
-        with use_scope("datasets", clear=True):
+        with use_scope("main_view", clear=True):
             data = input_group("Upload utterance", [
                 textarea("transcript", placeholder="hello world", required=True, name="utterance"),
                 file_upload("speech recording", name="file")
@@ -289,7 +289,7 @@ def utt_menu(back_handler=None):
                     put_code(json.dumps(meta, indent=4), "json")
 
     if opt == "delete_utt":
-        with use_scope("datasets", clear=True):
+        with use_scope("main_view", clear=True):
             put_markdown("""Are you sure you want to delete the utterances database?
                         **this can not be undone**, proceed with caution!
                         **ALL** utterance recordings will be **lost**""")
@@ -299,12 +299,12 @@ def utt_menu(back_handler=None):
         if opt:
             # TODO - also remove files from path
             os.remove(JsonUtteranceDatabase().db.path)
-            with use_scope("datasets", clear=True):
+            with use_scope("main_view", clear=True):
                 put_text("utterance database deleted!")
         datasets_menu(back_handler=back_handler)
         return
     if opt == "main":
-        with use_scope("datasets", clear=True):
+        with use_scope("main_view", clear=True):
             datasets_menu(back_handler=back_handler)
         return
 
@@ -330,7 +330,7 @@ def datasets_menu(back_handler=None):
     if opt == "ww":
         ww_menu(back_handler=back_handler)
     if opt == "main":
-        with use_scope("datasets", clear=True):
+        with use_scope("main_view", clear=True):
             if back_handler:
                 back_handler()
         return

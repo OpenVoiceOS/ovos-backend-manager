@@ -27,10 +27,13 @@ def device_select(back_handler=None):
         else:
             if uuid == "all":
                 uuid = None
-            metrics_select(uuid=uuid, back_handler=back_handler)
+            if uuid is not None:
+                with use_scope("main_view", clear=True):
+                    put_markdown(f"\nDevice: {uuid}")
+            metrics_menu(uuid=uuid, back_handler=back_handler)
     else:
         popup("No devices paired yet!")
-        metrics_menu(back_handler)
+        metrics_menu(back_handler=back_handler)
 
 
 def metrics_select(back_handler=None, uuid=None):
@@ -40,7 +43,7 @@ def metrics_select(back_handler=None, uuid=None):
     if not len(db):
         with use_scope("main_view", clear=True):
             put_text("No metrics uploaded yet!")
-        metrics_menu(back_handler=back_handler)
+        metrics_menu(back_handler=back_handler, uuid=uuid)
         return
 
     for m in db:
@@ -59,10 +62,10 @@ def metrics_select(back_handler=None, uuid=None):
     with use_scope("main_view", clear=True):
         put_markdown("# Metadata")
         put_code(json.dumps(db[opt - 1], indent=4), "json")
-    metrics_select(back_handler=back_handler)
+    metrics_select(back_handler=back_handler, uuid=uuid)
 
 
-def metrics_menu(back_handler=None):
+def metrics_menu(back_handler=None, uuid=None):
     with use_scope("logo", clear=True):
         img = open(f'{os.path.dirname(__file__)}/res/metrics.png', 'rb').read()
         put_image(img)
@@ -72,48 +75,66 @@ def metrics_menu(back_handler=None):
                {'label': 'FallbackSkill', 'value': "fallback"},
                {'label': 'STT', 'value': "stt"},
                {'label': 'TTS', 'value': "tts"},
-               {'label': 'Open Dataset', 'value': "opt-in"},
-               {'label': 'Inspect Device Metrics', 'value': "metrics"},
-               {'label': 'Delete metrics database', 'value': "delete_metrics"}
-               ]
+               {'label': 'Open Dataset', 'value': "opt-in"}]
+    if uuid is not None:
+        buttons.append({'label': 'Delete Device metrics', 'value': "delete_metrics"})
+    else:
+        buttons.append({'label': 'Inspect Devices', 'value': "metrics"})
+        buttons.append({'label': 'Delete ALL metrics', 'value': "delete_metrics"})
+
     if back_handler:
         buttons.insert(0, {'label': '<- Go Back', 'value': "main"})
 
     opt = actions(label="What would you like to do?",
                   buttons=buttons)
-    m = MetricsReportGenerator()
+    if uuid is not None:
+        m = DeviceMetricsReportGenerator(uuid)
+    else:
+        m = MetricsReportGenerator()
     if opt == "opt-in":
         with use_scope("main_view", clear=True):
-            put_markdown(f"""
-        # Open Dataset Report
+            if uuid is None:
+                md = f"""# Open Dataset Report
+            Total Registered Devices: {len(DeviceDatabase())}
+            Currently Opted-in: {len([d for d in DeviceDatabase() if d.opt_in])}
+            Unique Devices seen: {m.total_devices}"""
+            else:
+                md = f"""Device: {uuid}
+            
+            # Open Dataset Report"""
 
-        Total Registered Devices: {len(DeviceDatabase())}
-        Currently Opted-in: {len([d for d in DeviceDatabase() if d.opt_in])}
-        Unique Devices seen: {m.total_devices}
-        
-        Total Metrics submitted: {len(JsonMetricDatabase())}
-        Total WakeWords submitted: {len(JsonWakeWordDatabase())} 
-        Total Utterances submitted: {len(JsonUtteranceDatabase())} 
-        """)
-            put_html(m.uploads_chart().render_notebook())
+            md += f"""
+            
+            Total Metrics submitted: {m.total_metrics}
+            Total WakeWords submitted: {m.total_ww}
+            Total Utterances submitted: {m.total_utt}"""
+
+            put_markdown(md)
+            put_html(m.optin_chart().render_notebook())
 
     if opt == "intents":
         with use_scope("main_view", clear=True):
-            put_markdown(f"""
-                    # Intent Matches Report
-
-                    Total queries: {m.total_intents + m.total_fallbacks}
-                    Total Intents: {m.total_intents}
-                    """)
+            if uuid is not None:
+                put_markdown(f"\nDevice: {uuid}")
+            md = f"""# Intent Matches Report
+            Total queries: {m.total_intents + m.total_fallbacks}
+            Total Intents: {m.total_intents}"""
+            put_markdown(md)
             put_html(m.intent_type_chart().render_notebook())
     if opt == "stt":
         with use_scope("main_view", clear=True):
+            if uuid is not None:
+                put_markdown(f"\nDevice: {uuid}")
             put_html(m.stt_type_chart().render_notebook())
     if opt == "tts":
         with use_scope("main_view", clear=True):
+            if uuid is not None:
+                put_markdown(f"\nDevice: {uuid}")
             put_html(m.tts_type_chart().render_notebook())
     if opt == "types":
         with use_scope("main_view", clear=True):
+            if uuid is not None:
+                put_markdown(f"\nDevice: {uuid}")
             put_markdown(f"""
         # Metrics Report
         
@@ -125,6 +146,8 @@ def metrics_menu(back_handler=None):
             put_html(m.metrics_type_chart().render_notebook())
     if opt == "fallback":
         with use_scope("main_view", clear=True):
+            if uuid is not None:
+                put_markdown(f"\nDevice: {uuid}")
             f = 0
             if m.total_intents + m.total_fallbacks > 0:
                 f = m.total_intents / (m.total_intents + m.total_fallbacks)
@@ -141,6 +164,9 @@ def metrics_menu(back_handler=None):
     if opt == "metrics":
         device_select(back_handler=back_handler)
     if opt == "delete_metrics":
+        if uuid is not None:
+            with use_scope("main_view", clear=True):
+                put_markdown(f"\nDevice: {uuid}")
         with popup("Are you sure you want to delete the metrics database?"):
             put_text("this can not be undone, proceed with caution!")
             put_text("ALL metrics will be lost")
@@ -153,14 +179,16 @@ def metrics_menu(back_handler=None):
                 if back_handler:
                     back_handler()
         else:
-            metrics_menu(back_handler=back_handler)
+            metrics_menu(back_handler=back_handler, uuid=uuid)
         return
     if opt == "main":
         with use_scope("main_view", clear=True):
-            if back_handler:
+            if uuid is not None:
+                device_select(back_handler=back_handler)
+            elif back_handler:
                 back_handler()
         return
-    metrics_menu(back_handler=back_handler)
+    metrics_menu(back_handler=back_handler, uuid=uuid)
 
 
 class MetricsReportGenerator:
@@ -172,6 +200,7 @@ class MetricsReportGenerator:
         self.total_ww = len(JsonWakeWordDatabase())
         self.total_utt = len(JsonUtteranceDatabase())
         self.total_devices = len(DeviceDatabase())
+        self.total_metrics = len(JsonMetricDatabase())
 
         self.intents = {}
         self.fallbacks = {}
@@ -179,13 +208,13 @@ class MetricsReportGenerator:
         self.stt = {}
         self.load_metrics()
 
-    def uploads_chart(self):
+    def optin_chart(self):
         chart = Pie("Uploaded Data")
         chart.set_options(
-            labels=["wake-words", "utterances"],
+            labels=["wake-words", "utterances", "metrics"],
             inner_radius=0,
         )
-        chart.add_series([self.total_ww, self.total_utt])
+        chart.add_series([self.total_ww, self.total_utt, self.total_metrics])
         return chart
 
     def metrics_type_chart(self):
@@ -236,12 +265,14 @@ class MetricsReportGenerator:
         chart.add_series(list(self.stt.values()))
         return chart
 
-    def load_metrics(self):
+    def reset_metrics(self):
         self.total_intents = 0
         self.total_fallbacks = 0
         self.total_stt = 0
         self.total_tts = 0
         self.total_ww = len(JsonWakeWordDatabase())
+        self.total_metrics = len(JsonMetricDatabase())
+        self.total_utt = len(JsonUtteranceDatabase())
         self.total_devices = 0
 
         self.intents = {}
@@ -249,35 +280,60 @@ class MetricsReportGenerator:
         self.tts = {}
         self.stt = {}
 
-        db = JsonMetricDatabase()
+    def load_metrics(self):
+        self.reset_metrics()
         devs = []
-        for m in db:
+        for m in JsonMetricDatabase():
             if m["uuid"] not in devs:
                 devs.append(m["uuid"])
                 self.total_devices += 1
-            if m["metric_type"] == "intent_service":
-                self.total_intents += 1
-                k = f"{m['meta']['intent_type']}"
-                if k not in self.intents:
-                    self.intents[k] = 0
-                self.intents[k] += 1
-            if m["metric_type"] == "fallback_handler":
-                self.total_fallbacks += 1
-                k = f"{m['meta']['handler']}"
-                if m['meta'].get("skill_id"):
-                    k = f"{m['meta']['skill_id']}:{m['meta']['handler']}"
-                if k not in self.fallbacks:
-                    self.fallbacks[k] = 0
-                self.fallbacks[k] += 1
-            if m["metric_type"] == "stt":
-                self.total_stt += 1
-                k = f"{m['meta']['stt']}"
-                if k not in self.stt:
-                    self.stt[k] = 0
-                self.stt[k] += 1
-            if m["metric_type"] == "speech":
-                self.total_tts += 1
-                k = f"{m['meta']['tts']}"
-                if k not in self.tts:
-                    self.tts[k] = 0
-                self.tts[k] += 1
+            self._process_metric(m)
+
+    def _process_metric(self, m):
+        if m["metric_type"] == "intent_service":
+            self.total_intents += 1
+            k = f"{m['meta']['intent_type']}"
+            if k not in self.intents:
+                self.intents[k] = 0
+            self.intents[k] += 1
+        if m["metric_type"] == "fallback_handler":
+            self.total_fallbacks += 1
+            k = f"{m['meta']['handler']}"
+            if m['meta'].get("skill_id"):
+                k = f"{m['meta']['skill_id']}:{m['meta']['handler']}"
+            if k not in self.fallbacks:
+                self.fallbacks[k] = 0
+            self.fallbacks[k] += 1
+        if m["metric_type"] == "stt":
+            self.total_stt += 1
+            k = f"{m['meta']['stt']}"
+            if k not in self.stt:
+                self.stt[k] = 0
+            self.stt[k] += 1
+        if m["metric_type"] == "speech":
+            self.total_tts += 1
+            k = f"{m['meta']['tts']}"
+            if k not in self.tts:
+                self.tts[k] = 0
+            self.tts[k] += 1
+
+
+class DeviceMetricsReportGenerator(MetricsReportGenerator):
+    def __init__(self, uuid):
+        self.uuid = uuid
+        super().__init__()
+
+    def load_metrics(self):
+        self.reset_metrics()
+
+        self.total_ww = len([ww for ww in JsonWakeWordDatabase()
+                             if ww["uuid"] == self.uuid])
+        self.total_metrics = 0
+        self.total_utt = len([utt for utt in JsonUtteranceDatabase()
+                              if utt["uuid"] == self.uuid])
+
+        for m in JsonMetricDatabase():
+            if m["uuid"] != self.uuid:
+                continue
+            self._process_metric(m)
+            self.total_metrics += 1
