@@ -7,7 +7,7 @@ from ovos_local_backend.database.settings import DeviceDatabase
 from ovos_local_backend.database.utterances import JsonUtteranceDatabase
 from ovos_local_backend.database.wakewords import JsonWakeWordDatabase
 from pywebio.input import actions
-from pywebio.output import put_text, popup, put_code, put_markdown, put_html, use_scope
+from pywebio.output import put_text, popup, put_code, put_markdown, put_html, use_scope, put_image
 
 
 def device_select(back_handler=None):
@@ -34,6 +34,7 @@ def device_select(back_handler=None):
 
 
 def metrics_select(back_handler=None, uuid=None):
+
     buttons = []
     db = JsonMetricDatabase()
     if not len(db):
@@ -62,6 +63,10 @@ def metrics_select(back_handler=None, uuid=None):
 
 
 def metrics_menu(back_handler=None):
+    with use_scope("logo", clear=True):
+        img = open(f'{os.path.dirname(__file__)}/res/metrics.png', 'rb').read()
+        put_image(img)
+
     buttons = [{'label': 'Metric Types', 'value': "types"},
                {'label': 'Intents', 'value': "intents"},
                {'label': 'FallbackSkill', 'value': "fallback"},

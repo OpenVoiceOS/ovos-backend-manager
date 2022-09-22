@@ -7,10 +7,10 @@ from ovos_local_backend.database.settings import DeviceDatabase
 from ovos_local_backend.database.utterances import JsonUtteranceDatabase
 from ovos_local_backend.database.wakewords import JsonWakeWordDatabase
 from pywebio.input import actions, file_upload, input_group, textarea
-from pywebio.output import put_text, put_code, use_scope, put_markdown, popup
+from pywebio.output import put_text, put_code, use_scope, put_markdown, popup, put_image
 
 
-def ww_select(back_handler=None, uuid=None):
+def ww_select(back_handler=None, uuid=None, ww=None):
     buttons = []
     db = JsonWakeWordDatabase()
     if not len(db):
@@ -21,6 +21,8 @@ def ww_select(back_handler=None, uuid=None):
 
     for m in db:
         if uuid is not None and m["uuid"] != uuid:
+            continue
+        if ww is not None and m["transcription"] != ww:
             continue
         name = f"{m['wakeword_id']}-{m['transcription']}"
         buttons.append({'label': name, 'value': m['wakeword_id']})
@@ -40,10 +42,10 @@ def ww_select(back_handler=None, uuid=None):
     # id == db_position + 1
     with use_scope("datasets", clear=True):
         put_code(json.dumps(db[opt - 1], indent=4), "json")
-    ww_select(back_handler=back_handler)
+    ww_select(back_handler=back_handler, ww=ww, uuid=uuid)
 
 
-def utt_select(back_handler=None, uuid=None):
+def utt_select(back_handler=None, uuid=None, utt=None):
     buttons = []
     db = JsonUtteranceDatabase()
     if not len(db):
@@ -54,6 +56,8 @@ def utt_select(back_handler=None, uuid=None):
 
     for m in db:
         if uuid is not None and m["uuid"] != uuid:
+            continue
+        if utt is not None and m["transcription"] != utt:
             continue
         name = f"{m['utterance_id']}-{m['transcription']}"
         buttons.append({'label': name, 'value': m['utterance_id']})
@@ -74,7 +78,7 @@ def utt_select(back_handler=None, uuid=None):
     # id == db_position + 1
     with use_scope("datasets", clear=True):
         put_code(json.dumps(db[opt - 1], indent=4), "json")
-    utt_select(back_handler=back_handler)
+    utt_select(back_handler=back_handler, uuid=uuid, utt=utt)
 
 
 def device_select(back_handler=None, ww=True):
@@ -108,8 +112,55 @@ def device_select(back_handler=None, ww=True):
             utt_menu(back_handler=back_handler)
 
 
+def ww_opts(back_handler=None, uuid=None):
+    wws = list(set([ww["transcription"] for ww in JsonWakeWordDatabase()]))
+    buttons = [{'label': "All Wake Words", 'value': "all"}] + \
+              [{'label': ww, 'value': ww} for ww in wws]
+    if back_handler:
+        buttons.insert(0, {'label': '<- Go Back', 'value': "main"})
+
+    if wws:
+        ww = actions(label="What wake word would you like to inspect?", buttons=buttons)
+        if ww == "main":
+            datasets_menu(back_handler=back_handler)
+            return
+        if ww == "all":
+            ww = None
+        ww_select(ww=ww, back_handler=back_handler, uuid=uuid)
+    else:
+        with use_scope("datasets", clear=True):
+            put_text("No wake words uploaded yet!")
+        ww_menu(back_handler=back_handler)
+
+
+def utt_opts(back_handler=None, uuid=None):
+    utts = list(set([ww["transcription"] for ww in JsonUtteranceDatabase()]))
+    buttons = [{'label': "All Utterances", 'value': "all"}] + \
+              [{'label': ww, 'value': ww} for ww in utts]
+    if back_handler:
+        buttons.insert(0, {'label': '<- Go Back', 'value': "main"})
+
+    if utts:
+        utt = actions(label="What utterance would you like to inspect?", buttons=buttons)
+        if utt == "main":
+            datasets_menu(back_handler=back_handler)
+            return
+        if utt == "all":
+            utt = None
+        utt_select(utt=utt, back_handler=back_handler, uuid=uuid)
+    else:
+        with use_scope("datasets", clear=True):
+            put_text("No recordings uploaded yet!")
+        utt_menu(back_handler=back_handler)
+
+
 def ww_menu(back_handler=None):
-    buttons = [{'label': 'Inspect Wake Words', 'value': "ww"},
+    with use_scope("logo", clear=True):
+        img = open(f'{os.path.dirname(__file__)}/res/wakewords.png', 'rb').read()
+        put_image(img)
+
+    buttons = [{'label': 'Inspect Devices', 'value': "dev"},
+               {'label': 'Inspect Wake Words', 'value': "ww"},
                {'label': 'Upload Wake Word', 'value': "upload"},
                {'label': 'Delete wake words database', 'value': "delete_ww"}]
     if back_handler:
@@ -117,8 +168,10 @@ def ww_menu(back_handler=None):
 
     opt = actions(label="What would you like to do?",
                   buttons=buttons)
-    if opt == "ww":
+    if opt == "dev":
         device_select(back_handler=back_handler, ww=True)
+    if opt == "ww":
+        ww_opts(back_handler=back_handler)
     if opt == "upload":
         with use_scope("datasets", clear=True):
             data = input_group("Upload wake word", [
@@ -184,7 +237,12 @@ def ww_menu(back_handler=None):
 
 
 def utt_menu(back_handler=None):
-    buttons = [{'label': 'Inspect Recordings', 'value': "utt"},
+    with use_scope("logo", clear=True):
+        img = open(f'{os.path.dirname(__file__)}/res/utterances.png', 'rb').read()
+        put_image(img)
+
+    buttons = [{'label': 'Inspect Devices', 'value': "dev"},
+               {'label': 'Inspect Recordings', 'value': "utt"},
                {'label': 'Upload Utterance', 'value': "upload"},
                {'label': 'Delete utterances database', 'value': "delete_utt"}]
     if back_handler:
@@ -192,8 +250,10 @@ def utt_menu(back_handler=None):
 
     opt = actions(label="What would you like to do?",
                   buttons=buttons)
-    if opt == "utt":
+    if opt == "dev":
         device_select(back_handler=back_handler, ww=False)
+    if opt == "utt":
+        utt_opts(back_handler=back_handler)
     if opt == "upload":
         with use_scope("datasets", clear=True):
             data = input_group("Upload utterance", [
@@ -252,6 +312,10 @@ def utt_menu(back_handler=None):
 
 
 def datasets_menu(back_handler=None):
+    with use_scope("logo", clear=True):
+        img = open(f'{os.path.dirname(__file__)}/res/open_dataset.png', 'rb').read()
+        put_image(img)
+
     buttons = [{'label': 'Wake Words', 'value': "ww"},
                {'label': 'Utterance Recordings', 'value': "utt"}
                ]

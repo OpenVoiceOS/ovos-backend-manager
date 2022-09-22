@@ -1,9 +1,15 @@
+import os
+
 from ovos_local_backend.configuration import CONFIGURATION
 from pywebio.input import actions
-from pywebio.output import put_table, popup
+from pywebio.output import put_table, popup, use_scope, put_image
 
 
 def selene_menu(back_handler=None):
+    with use_scope("logo", clear=True):
+        img = open(f'{os.path.dirname(__file__)}/res/selene_proxy.png', 'rb').read()
+        put_image(img)
+
     if CONFIGURATION["selene"]["enabled"]:
         buttons = [{'label': "View configuration", 'value': "view"},
                    {'label': "Disable Selene", 'value': "selene"}]

@@ -1,12 +1,17 @@
 import json
+import os
 
 from ovos_local_backend.configuration import CONFIGURATION
 from ovos_local_backend.utils.geolocate import get_location_config
 from pywebio.input import textarea, select, actions
-from pywebio.output import put_table, put_markdown, popup, put_code
+from pywebio.output import put_table, put_markdown, popup, put_code, put_image, use_scope
 
 
 def backend_menu(back_handler=None):
+    with use_scope("logo", clear=True):
+        img = open(f'{os.path.dirname(__file__)}/res/backend_config.png', 'rb').read()
+        put_image(img)
+
     auth = 'Enable device auth' if not CONFIGURATION["skip_auth"] else 'Disable device auth'
 
     buttons = [{'label': "View configuration", 'value': "view"},

@@ -1,16 +1,21 @@
 from ovos_local_backend.configuration import CONFIGURATION
 from pywebio.input import textarea, actions
-from pywebio.output import put_text, popup
+from pywebio.output import put_text, popup, use_scope, put_image
 
 from ovos_backend_manager.backend import backend_menu
 from ovos_backend_manager.datasets import datasets_menu
 from ovos_backend_manager.devices import device_select, instant_pair
-from ovos_backend_manager.microservices import microservices_menu
 from ovos_backend_manager.metrics import metrics_menu
+from ovos_backend_manager.microservices import microservices_menu
 from ovos_backend_manager.selene import selene_menu
 
 
 def main_menu():
+    with use_scope("logo", clear=True):
+        from os.path import dirname
+        img = open(f'{dirname(__file__)}/res/personal_backend.png', 'rb').read()
+        put_image(img)
+
     opt = actions(label="What would you like to do?",
                   buttons=[{'label': 'Pair a device', 'value': "pair"},
                            {'label': 'Manage Devices', 'value': "device"},
@@ -48,5 +53,10 @@ def app():
     if not CONFIGURATION["admin_key"]:
         put_text("This personal backend instance does not have the admin interface exposed")
         exit(1)
+    with use_scope("logo", clear=True):
+        from os.path import dirname
+        img = open(f'{dirname(__file__)}/res/personal_backend.png', 'rb').read()
+        put_image(img)
+
     prompt_admin_key()
     main_menu()

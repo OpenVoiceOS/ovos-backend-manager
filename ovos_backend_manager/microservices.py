@@ -1,8 +1,9 @@
 import json
+import os
 
 from ovos_local_backend.configuration import CONFIGURATION
 from pywebio.input import select, actions, input_group, input, TEXT, NUMBER
-from pywebio.output import put_text, put_table, popup, put_code
+from pywebio.output import put_text, put_table, popup, put_code, put_image, use_scope
 
 STT_CONFIGS = {
     "OpenVoiceOS (google proxy)": {"module": "ovos-stt-plugin-server", "url": "https://stt.openvoiceos.com/stt"},
@@ -35,6 +36,10 @@ STT_CONFIGS = {
 
 
 def microservices_menu(back_handler=None):
+    with use_scope("logo", clear=True):
+        img = open(f'{os.path.dirname(__file__)}/res/microservices_config.png', 'rb').read()
+        put_image(img)
+
     selene = CONFIGURATION["selene"]["enabled"]
     buttons = [{'label': "View configuration", 'value': "view"},
                {'label': 'Configure STT', 'value': "stt"},

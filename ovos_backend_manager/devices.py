@@ -8,7 +8,7 @@ from ovos_local_backend.database.settings import DeviceDatabase
 from ovos_local_backend.utils import generate_code
 from ovos_local_backend.utils.geolocate import get_location_config
 from pywebio.input import textarea, select, actions, checkbox
-from pywebio.output import put_text, put_table, put_markdown, popup, put_code, use_scope
+from pywebio.output import put_text, put_table, put_markdown, popup, put_code, use_scope, put_image
 
 
 def device_menu(uuid, back_handler=None):
@@ -169,6 +169,10 @@ def device_menu(uuid, back_handler=None):
 
 
 def device_select(back_handler=None):
+    with use_scope("logo", clear=True):
+        img = open(f'{os.path.dirname(__file__)}/res/devices.png', 'rb').read()
+        put_image(img)
+
     devices = {uuid: f"{device['name']}@{device['device_location']}"
                for uuid, device in DeviceDatabase().items()}
     buttons = [{'label': d, 'value': uuid} for uuid, d in devices.items()] + \
@@ -181,7 +185,8 @@ def device_select(back_handler=None):
                        buttons=buttons)
         if uuid == "main":
             with use_scope("device", clear=True):
-                back_handler()
+                if back_handler:
+                    back_handler()
             return
         elif uuid == "delete_devices":
             with popup("Are you sure you want to delete the device database?"):
@@ -201,10 +206,15 @@ def device_select(back_handler=None):
     else:
         popup("No devices paired yet!")
         if back_handler:
-            back_handler()
+            with use_scope("device", clear=True):
+                back_handler()
 
 
 def instant_pair(back_handler=None):
+    with use_scope("logo", clear=True):
+        img = open(f'{os.path.dirname(__file__)}/res/devices.png', 'rb').read()
+        put_image(img)
+
     uuid = str(uuid4())
     code = generate_code()
     token = f"{code}:{uuid}"
@@ -212,7 +222,8 @@ def instant_pair(back_handler=None):
     with DeviceDatabase() as db:
         db.add_device(uuid, token)
 
-    with popup("Device paired!"):
+    with use_scope("device", clear=True):
+        put_markdown("# Device paired!")
         put_table([
             ['UUID', uuid],
             ['CODE', code],
