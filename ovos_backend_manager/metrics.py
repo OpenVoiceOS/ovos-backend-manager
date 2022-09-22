@@ -22,7 +22,7 @@ def device_select(back_handler=None):
         uuid = actions(label="What device would you like to inspect?",
                        buttons=buttons)
         if uuid == "main":
-            back_handler()
+            metrics_menu(back_handler=back_handler)
             return
         else:
             if uuid == "all":
@@ -30,8 +30,7 @@ def device_select(back_handler=None):
             metrics_select(uuid=uuid, back_handler=back_handler)
     else:
         popup("No devices paired yet!")
-        if back_handler:
-            back_handler()
+        metrics_menu(back_handler)
 
 
 def metrics_select(back_handler=None, uuid=None):
@@ -53,7 +52,7 @@ def metrics_select(back_handler=None, uuid=None):
     opt = actions(label="Select a metric to inspect",
                   buttons=buttons)
     if opt == "main":
-        metrics_menu(back_handler=back_handler)
+        device_select(back_handler=back_handler)
         return
     # id == db_position + 1
     with use_scope("charts", clear=True):
