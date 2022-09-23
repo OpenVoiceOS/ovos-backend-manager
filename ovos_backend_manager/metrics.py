@@ -1,5 +1,6 @@
 import json
 import os
+import time
 
 from cutecharts.charts import Pie
 from ovos_local_backend.database.metrics import JsonMetricDatabase
@@ -37,7 +38,6 @@ def device_select(back_handler=None):
 
 
 def metrics_select(back_handler=None, uuid=None):
-
     buttons = []
     db = JsonMetricDatabase()
     if not len(db):
@@ -80,6 +80,7 @@ def metrics_menu(back_handler=None, uuid=None):
     if uuid is not None:
         buttons.append({'label': 'Delete Device metrics', 'value': "delete_metrics"})
     else:
+        buttons.insert(1, {'label': 'Devices', 'value': "devices"})
         buttons.append({'label': 'Inspect Devices', 'value': "metrics"})
         buttons.append({'label': 'Delete ALL metrics', 'value': "delete_metrics"})
 
@@ -112,7 +113,16 @@ def metrics_menu(back_handler=None, uuid=None):
 
             put_markdown(md)
             put_html(m.optin_chart().render_notebook())
+    if opt == "devices":
+        with use_scope("main_view", clear=True):
+            md = f"""# Devices Report
+            Total Devices: {m.total_devices}
 
+            Total untracked: {len(m.untracked_devices)}
+            Total active (estimate): {len(m.active_devices)}
+            Total dormant (estimate): {len(m.dormant_devices)}"""
+            put_markdown(md)
+            put_html(m.device_chart().render_notebook())
     if opt == "intents":
         with use_scope("main_view", clear=True):
             txt_estimate = max(m.total_intents + m.total_fallbacks - m.total_stt, 0)
@@ -139,7 +149,7 @@ def metrics_menu(back_handler=None, uuid=None):
             Total WakeWord detections (estimate): {m.total_stt}
             False Activations (estimate): {bad or silents}
             Silent Activations (estimate): {silents}""")
-            # put_html(m.ww_type_chart().render_notebook())
+            put_html(m.ww_chart().render_notebook())
     if opt == "stt":
         silents = max(0, m.total_stt - m.total_utt)
         with use_scope("main_view", clear=True):
@@ -228,9 +238,53 @@ class MetricsReportGenerator:
 
         self.intents = {}
         self.fallbacks = {}
+        self.ww = {}
         self.tts = {}
         self.stt = {}
+        self.devices = {}
         self.load_metrics()
+
+    @property
+    def active_devices(self):
+        thresh = time.time() - 7 * 24 * 60 * 60
+        return [uuid for uuid, ts in self.devices.items()
+                if ts > thresh and uuid not in self.untracked_devices]
+
+    @property
+    def dormant_devices(self):
+        return [uuid for uuid in self.devices.keys()
+                if uuid not in self.untracked_devices
+                and uuid not in self.active_devices]
+
+    @property
+    def untracked_devices(self):
+        return [dev.uuid for dev in DeviceDatabase() if not dev.opt_in]
+
+    def device_chart(self):
+        chart = Pie("Devices")
+        chart.set_options(
+            labels=["active", "dormant", "untracked"],
+            inner_radius=0,
+        )
+        chart.add_series([len(self.active_devices),
+                          len(self.dormant_devices),
+                          len(self.untracked_devices)])
+        return chart
+
+    def ww_chart(self):
+        chart = Pie("Wake Words")
+        labels = []
+        series = []
+        for ww, count in self.ww.items():
+            labels.append(ww)
+            series.append(count)
+
+        chart.set_options(
+            labels=labels,
+            inner_radius=0,
+        )
+        chart.add_series(series)
+        return chart
 
     def optin_chart(self):
         chart = Pie("Uploaded Data")
@@ -300,20 +354,28 @@ class MetricsReportGenerator:
         self.total_devices = 0
 
         self.intents = {}
+        self.devices = {}
         self.fallbacks = {}
         self.tts = {}
         self.stt = {}
+        self.ww = {}
 
     def load_metrics(self):
         self.reset_metrics()
-        devs = []
         for m in JsonMetricDatabase():
-            if m["uuid"] not in devs:
-                devs.append(m["uuid"])
+            if m["uuid"] not in self.devices:
                 self.total_devices += 1
             self._process_metric(m)
+        for ww in JsonWakeWordDatabase():
+            if ww["meta"]["name"] not in self.ww:
+                self.ww[ww["meta"]["name"]] = 0
+            else:
+                self.ww[ww["meta"]["name"]] += 1
 
     def _process_metric(self, m):
+        if m["uuid"] not in self.devices or \
+                m["meta"]["time"] > self.devices[m["uuid"]]:
+            self.devices[m["uuid"]] = m["meta"]["time"]
         if m["metric_type"] == "intent_service":
             self.total_intents += 1
             k = f"{m['meta']['intent_type']}"
@@ -361,3 +423,15 @@ class DeviceMetricsReportGenerator(MetricsReportGenerator):
                 continue
             self._process_metric(m)
             self.total_metrics += 1
+        for ww in JsonWakeWordDatabase():
+            if ww["uuid"] != self.uuid:
+                continue
+            if ww["meta"]["name"] not in self.ww:
+                self.ww[ww["meta"]["name"]] = 0
+            else:
+                self.ww[ww["meta"]["name"]] += 1
+
+
+if __name__ == "__main__":
+    for ww in JsonWakeWordDatabase():
+        print(ww)
