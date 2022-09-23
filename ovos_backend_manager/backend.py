@@ -12,10 +12,33 @@ def backend_menu(back_handler=None):
         img = open(f'{os.path.dirname(__file__)}/res/backend_config.png', 'rb').read()
         put_image(img)
 
+    with use_scope("main_view", clear=True):
+        put_table([
+            ['Backend Port', CONFIGURATION["backend_port"]],
+            ['Device Authentication enabled', not CONFIGURATION["skip_auth"]],
+            ['Location override enabled', CONFIGURATION["override_location"]],
+            ['IP Geolocation enabled', CONFIGURATION["geolocate"]],
+            ['Selene Proxy enabled', CONFIGURATION["selene"]["enabled"]],
+            ['Default TTS', CONFIGURATION["default_tts"]],
+            ['Default Wake Word', CONFIGURATION["default_ww"]],
+            ['Default date format', CONFIGURATION["date_format"]],
+            ['Default time format', CONFIGURATION["time_format"]],
+            ['Default system units', CONFIGURATION["system_unit"]]
+        ])
+        put_markdown(f'### Default location:')
+        put_table([
+            ['Timezone Code', CONFIGURATION["default_location"]["timezone"]["code"]],
+            ['City', CONFIGURATION["default_location"]["city"]["name"]],
+            ['State', CONFIGURATION["default_location"]["city"]["state"]["name"]],
+            ['Country', CONFIGURATION["default_location"]["city"]["state"]["country"]["name"]],
+            ['Country Code', CONFIGURATION["default_location"]["city"]["state"]["country"]["code"]],
+            ['Latitude', CONFIGURATION["default_location"]["coordinate"]["latitude"]],
+            ['Longitude', CONFIGURATION["default_location"]["coordinate"]["longitude"]]
+        ])
+
     auth = 'Enable device auth' if not CONFIGURATION["skip_auth"] else 'Disable device auth'
 
-    buttons = [{'label': "View configuration", 'value': "view"},
-               {'label': auth, 'value': "auth"},
+    buttons = [{'label': auth, 'value': "auth"},
                {'label': 'Set default location', 'value': "geo"},
                {'label': 'Set default voice', 'value': "tts"},
                {'label': 'Set default wake word', 'value': "ww"},
@@ -89,30 +112,6 @@ def backend_menu(back_handler=None):
                          required=True)
         CONFIGURATION["email"]["recipient"] = email
 
-    if opt == "view":
-        with popup("Backend Configuration"):
-            put_table([
-                ['Backend Port', CONFIGURATION["backend_port"]],
-                ['Device Authentication enabled', not CONFIGURATION["skip_auth"]],
-                ['Location override enabled', CONFIGURATION["override_location"]],
-                ['IP Geolocation enabled', CONFIGURATION["geolocate"]],
-                ['Selene Proxy enabled', CONFIGURATION["selene"]["enabled"]],
-                ['Default TTS', CONFIGURATION["default_tts"]],
-                ['Default Wake Word', CONFIGURATION["default_ww"]],
-                ['Default date format', CONFIGURATION["date_format"]],
-                ['Default time format', CONFIGURATION["time_format"]],
-                ['Default system units', CONFIGURATION["system_unit"]]
-            ])
-            put_markdown(f'### Default location:')
-            put_table([
-                ['City', CONFIGURATION["default_location"]["city"]["name"]],
-                ['State', CONFIGURATION["default_location"]["city"]["state"]["name"]],
-                ['Country', CONFIGURATION["default_location"]["city"]["state"]["country"]["name"]],
-                ['Country Code', CONFIGURATION["default_location"]["city"]["state"]["country"]["code"]],
-                ['Latitude', CONFIGURATION["default_location"]["coordinate"]["latitude"]],
-                ['Longitude', CONFIGURATION["default_location"]["coordinate"]["longitude"]],
-                ['Timezone Code', CONFIGURATION["default_location"]["timezone"]["code"]]
-            ])
-    else:
+    if opt != "view":
         CONFIGURATION.store()
     backend_menu(back_handler=back_handler)
