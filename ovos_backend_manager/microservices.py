@@ -41,8 +41,23 @@ def microservices_menu(back_handler=None):
         put_image(img)
 
     selene = CONFIGURATION["selene"]["enabled"]
-    buttons = [{'label': "View configuration", 'value': "view"},
-               {'label': 'Configure STT', 'value': "stt"},
+
+    with use_scope("main_view", clear=True):
+        put_table([
+            ['STT module', CONFIGURATION["stt"]["module"]],
+            ['OVOS microservices fallback enabled', CONFIGURATION["microservices"]["ovos_fallback"]],
+
+            ['WolframAlpha provider', CONFIGURATION["microservices"]["wolfram_provider"]],
+            ['Weather provider', CONFIGURATION["microservices"]["weather_provider"]],
+            ['Geolocation provider', CONFIGURATION["microservices"]["geolocation_provider"]],
+
+            ['Selene WolframAlpha proxy enabled', selene and CONFIGURATION["selene"]["proxy_wolfram"]],
+            ['Selene OpenWeatherMap proxy enabled', selene and CONFIGURATION["selene"]["proxy_weather"]],
+            ['Selene Geolocation proxy enabled', selene and CONFIGURATION["selene"]["proxy_geolocation"]],
+            ['Selene Email proxy enabled', selene and CONFIGURATION["selene"]["proxy_email"]]
+        ])
+
+    buttons = [{'label': 'Configure STT', 'value': "stt"},
                {'label': 'Configure Secrets', 'value': "secrets"},
                {'label': 'Configure SMTP', 'value': "smtp"},
                {'label': 'Configure Wolfram Alpha', 'value': "wolfram"},
@@ -63,12 +78,13 @@ def microservices_menu(back_handler=None):
                 back_handler()
         return
     elif opt == "geo":
-        opts = ["local"]  # TODO - ovos endpoint
+        opts = ["OpenStreetMap", "ArcGIS", "Geocode Farm"]  # TODO - ovos endpoint
         if selene and CONFIGURATION["selene"]["proxy_geolocation"]:
-            opts.append("selene")
+            opts.append("Selene")
         provider = select("Choose a weather provider", opts)
-        # TODO - implement selection backend side, config key below not live
-        CONFIGURATION["microservices"]["geolocation_provider"] = provider
+        if provider == "OpenStreetMap":
+            provider = "osm"
+        CONFIGURATION["microservices"]["geolocation_provider"] = provider.lower().replace(" ", "_")
     elif opt == "weather":
         opts = ["ovos"]
         if CONFIGURATION["microservices"]["owm_key"]:
@@ -76,7 +92,7 @@ def microservices_menu(back_handler=None):
         if selene and CONFIGURATION["selene"]["proxy_weather"]:
             opts.append("selene")
         provider = select("Choose a weather provider", opts)
-        CONFIGURATION["microservices"]["owm_provider"] = provider
+        CONFIGURATION["microservices"]["weather_provider"] = provider
     elif opt == "wolfram":
         opts = ["ovos"]
         if CONFIGURATION["microservices"]["wolfram_key"]:
@@ -140,24 +156,6 @@ def microservices_menu(back_handler=None):
         with popup(f"SMTP configuration for: {data['host']}"):
             put_code(json.dumps(data, ensure_ascii=True, indent=2), "json")
 
-    if opt == "view":
-        with popup("Microservices Configuration"):
-            put_table([
-                ['STT module', CONFIGURATION["stt"]["module"]],
-                ['OVOS microservices fallback enabled', CONFIGURATION["microservices"]["ovos_fallback"]],
-
-                ['WolframAlpha provider', CONFIGURATION["microservices"]["wolfram_provider"]],
-                ['Weather provider', CONFIGURATION["microservices"]["weather_provider"]],
-
-                ['Selene WolframAlpha proxy enabled', selene and CONFIGURATION["selene"]["proxy_wolfram"]],
-                ['Selene OpenWeatherMap proxy enabled', selene and CONFIGURATION["selene"]["proxy_weather"]],
-                ['Selene Geolocation proxy enabled', selene and CONFIGURATION["selene"]["proxy_geolocation"]],
-                ['Selene Email proxy enabled', selene and CONFIGURATION["selene"]["proxy_email"]],
-
-                ['WolframAlpha Key', CONFIGURATION["microservices"]["wolfram_key"]],
-                ['OpenWeatherMap Key', CONFIGURATION["microservices"]["owm_key"]]
-            ])
-    else:
-        CONFIGURATION.store()
+    CONFIGURATION.store()
 
     microservices_menu(back_handler=back_handler)
