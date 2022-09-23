@@ -1,13 +1,14 @@
 import json
 import os
 import time
+from base64 import b64encode
 
 from ovos_local_backend.configuration import CONFIGURATION
 from ovos_local_backend.database.settings import DeviceDatabase
 from ovos_local_backend.database.utterances import JsonUtteranceDatabase
 from ovos_local_backend.database.wakewords import JsonWakeWordDatabase
 from pywebio.input import actions, file_upload, input_group, textarea
-from pywebio.output import put_text, put_code, use_scope, put_markdown, popup, put_image
+from pywebio.output import put_text, put_code, use_scope, put_markdown, popup, put_image, put_file, put_html
 
 
 def ww_select(back_handler=None, uuid=None, ww=None):
@@ -39,9 +40,21 @@ def ww_select(back_handler=None, uuid=None, ww=None):
     if opt == "main":
         ww_menu(back_handler=back_handler)
         return
-    # id == db_position + 1
+
     with use_scope("main_view", clear=True):
-        put_code(json.dumps(db[opt - 1], indent=4), "json")
+        data = db[opt - 1]  # id == db_position + 1
+        put_code(json.dumps(data, indent=4), "json")
+        if os.path.isfile(data["path"]):
+            content = open(data["path"], 'rb').read()
+            html = f"""
+            <audio controls src="data:audio/x-wav;base64,{b64encode(content).decode('ascii')}" />
+            """
+            put_html(html)
+            put_file(data["path"].split("/")[-1], content, 'Download Audio')
+
+        else:
+            put_markdown("**WARNING** - audio file not found")
+
     ww_select(back_handler=back_handler, ww=ww, uuid=uuid)
 
 
@@ -75,9 +88,17 @@ def utt_select(back_handler=None, uuid=None, utt=None):
         utt_menu(back_handler=back_handler)
         return
 
-    # id == db_position + 1
     with use_scope("main_view", clear=True):
-        put_code(json.dumps(db[opt - 1], indent=4), "json")
+        data = db[opt - 1]  # id == db_position + 1
+        put_code(json.dumps(data, indent=4), "json")
+        if os.path.isfile(data["path"]):
+            content = open(data["path"], 'rb').read()
+            html = f"""<audio controls src="data:audio/x-wav;base64,{b64encode(content).decode('ascii')}" />"""
+            put_html(html)
+            put_file(data["path"].split("/")[-1], content, 'Download Audio')
+        else:
+            put_markdown("**WARNING** - audio file not found")
+
     utt_select(back_handler=back_handler, uuid=uuid, utt=utt)
 
 
