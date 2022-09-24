@@ -2,7 +2,7 @@ import json
 import os
 import time
 
-from cutecharts.charts import Pie, Bar
+from cutecharts.charts import Pie, Bar, Scatter
 from ovos_local_backend.database.metrics import JsonMetricDatabase
 from ovos_local_backend.database.settings import DeviceDatabase
 from ovos_local_backend.database.utterances import JsonUtteranceDatabase
@@ -76,7 +76,9 @@ def _plot_metrics(uuid, selected_metric="types"):
     with use_scope("main_view", clear=True):
         if uuid is not None:
             put_markdown(f"\nDevice: {uuid}")
-        if selected_metric == "stt":
+        if selected_metric == "timings":
+            put_html(m.timings_chart().render_notebook())
+        elif selected_metric == "stt":
             silents = max(0, m.total_stt - m.total_utt)
             put_markdown(f"""Total Transcriptions: {m.total_stt}
                     Total Recording uploads: {m.total_utt}
@@ -193,7 +195,8 @@ def metrics_menu(back_handler=None, uuid=None, selected_metric="types"):
 
     _plot_metrics(uuid, selected_metric)
 
-    buttons = [{'label': 'Metric Types', 'value': "types"},
+    buttons = [{'label': 'Timings', 'value': "timings"},
+               {'label': 'Metric Types', 'value': "types"},
                {'label': 'Intents', 'value': "intents"},
                {'label': 'FallbackSkill', 'value': "fallback"},
                {'label': 'STT', 'value': "stt"},
@@ -221,7 +224,7 @@ def metrics_menu(back_handler=None, uuid=None, selected_metric="types"):
             chart_type = Bar
         else:
             chart_type = Pie
-    elif opt in ["devices", "intents", "stt", "ww", "tts", "types", "fallback", "opt-in"]:
+    elif opt in ["devices", "intents", "stt", "ww", "tts", "types", "fallback", "opt-in", "timings"]:
         selected_metric = opt
     elif opt == "metrics":
         device_select(back_handler=back_handler)
@@ -272,11 +275,47 @@ class MetricsReportGenerator:
         self.tts = {}
         self.stt = {}
         self.devices = {}
-        self.intent_usage = {}
 
         self.stt_timings = []
+        self.tts_timings = []
+        self.intent_timings = []
+        self.fallback_timings = []
 
         self.load_metrics()
+
+    def reset_metrics(self):
+        self.total_intents = 0
+        self.total_fallbacks = 0
+        self.total_stt = 0
+        self.total_tts = 0
+        self.total_ww = len(JsonWakeWordDatabase())
+        self.total_metrics = len(JsonMetricDatabase())
+        self.total_utt = len(JsonUtteranceDatabase())
+        self.total_devices = 0
+
+        self.intents = {}
+        self.devices = {}
+        self.fallbacks = {}
+        self.tts = {}
+        self.stt = {}
+        self.ww = {}
+
+        self.stt_timings = []
+        self.tts_timings = []
+        self.intent_timings = []
+        self.fallback_timings = []
+
+    def load_metrics(self):
+        self.reset_metrics()
+        for m in JsonMetricDatabase():
+            if m["uuid"] not in self.devices:
+                self.total_devices += 1
+            self._process_metric(m)
+        for ww in JsonWakeWordDatabase():
+            if ww["meta"]["name"] not in self.ww:
+                self.ww[ww["meta"]["name"]] = 0
+            else:
+                self.ww[ww["meta"]["name"]] += 1
 
     @property
     def active_devices(self):
@@ -293,6 +332,25 @@ class MetricsReportGenerator:
     @property
     def untracked_devices(self):
         return [dev.uuid for dev in DeviceDatabase() if not dev.opt_in]
+
+    # cute charts
+    def timings_chart(self):
+        chart = Scatter("Execution Time")
+        chart.set_options(y_tick_count=8, is_show_line=True,
+                          x_label="Unix Time", y_label="Seconds")
+        chart.add_series(
+            "STT", [(z[0], z[1]) for z in self.stt_timings]
+        )
+        chart.add_series(
+            "TTS", [(z[0], z[1]) for z in self.tts_timings]
+        )
+        chart.add_series(
+            "Intent Matching", [(z[0], z[1]) for z in self.intent_timings]
+        )
+        chart.add_series(
+            "Fallback Handling", [(z[0], z[1]) for z in self.fallback_timings]
+        )
+        return chart
 
     def devices_pie_chart(self):
         chart = Pie("Devices")
@@ -457,48 +515,22 @@ class MetricsReportGenerator:
         chart.add_series(list(self.stt.values()))
         return chart
 
-    def reset_metrics(self):
-        self.total_intents = 0
-        self.total_fallbacks = 0
-        self.total_stt = 0
-        self.total_tts = 0
-        self.total_ww = len(JsonWakeWordDatabase())
-        self.total_metrics = len(JsonMetricDatabase())
-        self.total_utt = len(JsonUtteranceDatabase())
-        self.total_devices = 0
-
-        self.intents = {}
-        self.devices = {}
-        self.fallbacks = {}
-        self.tts = {}
-        self.stt = {}
-        self.ww = {}
-
-    def load_metrics(self):
-        self.reset_metrics()
-        for m in JsonMetricDatabase():
-            if m["uuid"] not in self.devices:
-                self.total_devices += 1
-            self._process_metric(m)
-        for ww in JsonWakeWordDatabase():
-            if ww["meta"]["name"] not in self.ww:
-                self.ww[ww["meta"]["name"]] = 0
-            else:
-                self.ww[ww["meta"]["name"]] += 1
-
     def _process_metric(self, m):
         if m["uuid"] not in self.devices or \
                 m["meta"]["time"] > self.devices[m["uuid"]]:
             self.devices[m["uuid"]] = m["meta"]["time"]
         if m["metric_type"] == "intent_service":
-            print(m)
+            start = m["meta"]["start_time"]
+            end = m["meta"]["time"]
+            duration = end - start
+            label = m["meta"]["intent_type"]
+            self.intent_timings.append((start, duration, label))
             self.total_intents += 1
             k = f"{m['meta']['intent_type']}"
             if k not in self.intents:
                 self.intents[k] = 0
             self.intents[k] += 1
         if m["metric_type"] == "fallback_handler":
-            print(m)
             self.total_fallbacks += 1
             k = f"{m['meta']['handler']}"
             if m['meta'].get("skill_id"):
@@ -506,8 +538,12 @@ class MetricsReportGenerator:
             if k not in self.fallbacks:
                 self.fallbacks[k] = 0
             self.fallbacks[k] += 1
+            start = m["meta"]["start_time"]
+            end = m["meta"]["time"]
+            duration = end - start
+            label = k
+            self.fallback_timings.append((start, duration, label))
         if m["metric_type"] == "stt":
-            print(m)
             start = m["meta"]["start_time"]
             end = m["meta"]["time"]
             duration = end - start
@@ -519,6 +555,11 @@ class MetricsReportGenerator:
                 self.stt[k] = 0
             self.stt[k] += 1
         if m["metric_type"] == "speech":
+            start = m["meta"]["start_time"]
+            end = m["meta"]["time"]
+            duration = end - start
+            label = m["meta"]["utterance"]
+            self.tts_timings.append((start, duration, label))
             self.total_tts += 1
             k = f"{m['meta']['tts']}"
             if k not in self.tts:
@@ -527,6 +568,9 @@ class MetricsReportGenerator:
 
         # sort by timestamp
         self.stt_timings = sorted(self.stt_timings, key=lambda k: k[0], reverse=True)
+        self.tts_timings = sorted(self.tts_timings, key=lambda k: k[0], reverse=True)
+        self.intent_timings = sorted(self.intent_timings, key=lambda k: k[0], reverse=True)
+        self.fallback_timings = sorted(self.fallback_timings, key=lambda k: k[0], reverse=True)
 
 
 class DeviceMetricsReportGenerator(MetricsReportGenerator):
