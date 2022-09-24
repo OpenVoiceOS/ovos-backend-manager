@@ -2,13 +2,15 @@ import json
 import os
 import time
 
-from cutecharts.charts import Pie
+from cutecharts.charts import Pie, Bar
 from ovos_local_backend.database.metrics import JsonMetricDatabase
 from ovos_local_backend.database.settings import DeviceDatabase
 from ovos_local_backend.database.utterances import JsonUtteranceDatabase
 from ovos_local_backend.database.wakewords import JsonWakeWordDatabase
 from pywebio.input import actions
 from pywebio.output import put_text, popup, put_code, put_markdown, put_html, use_scope, put_image
+
+chart_type = Pie
 
 
 def device_select(back_handler=None):
@@ -65,123 +67,84 @@ def metrics_select(back_handler=None, uuid=None):
     metrics_select(back_handler=back_handler, uuid=uuid)
 
 
-def metrics_menu(back_handler=None, uuid=None):
-    with use_scope("logo", clear=True):
-        img = open(f'{os.path.dirname(__file__)}/res/metrics.png', 'rb').read()
-        put_image(img)
-
-    buttons = [{'label': 'Metric Types', 'value': "types"},
-               {'label': 'Intents', 'value': "intents"},
-               {'label': 'FallbackSkill', 'value': "fallback"},
-               {'label': 'STT', 'value': "stt"},
-               {'label': 'TTS', 'value': "tts"},
-               {'label': 'Wake Words', 'value': "ww"},
-               {'label': 'Open Dataset', 'value': "opt-in"}]
-    if uuid is not None:
-        buttons.append({'label': 'Delete Device metrics', 'value': "delete_metrics"})
-    else:
-        buttons.insert(1, {'label': 'Devices', 'value': "devices"})
-        buttons.append({'label': 'Inspect Devices', 'value': "metrics"})
-        buttons.append({'label': 'Delete ALL metrics', 'value': "delete_metrics"})
-
-    if back_handler:
-        buttons.insert(0, {'label': '<- Go Back', 'value': "main"})
-
-    opt = actions(label="What would you like to do?",
-                  buttons=buttons)
+def _plot_metrics(uuid, selected_metric="types"):
     if uuid is not None:
         m = DeviceMetricsReportGenerator(uuid)
     else:
         m = MetricsReportGenerator()
-    if opt == "opt-in":
-        with use_scope("main_view", clear=True):
-            if uuid is None:
-                md = f"""# Open Dataset Report
-            Total Registered Devices: {len(DeviceDatabase())}
-            Currently Opted-in: {len([d for d in DeviceDatabase() if d.opt_in])}
-            Unique Devices seen: {m.total_devices}"""
+
+    with use_scope("main_view", clear=True):
+        if uuid is not None:
+            put_markdown(f"\nDevice: {uuid}")
+        if selected_metric == "stt":
+            silents = max(0, m.total_stt - m.total_utt)
+            put_markdown(f"""Total Transcriptions: {m.total_stt}
+                    Total Recording uploads: {m.total_utt}
+
+                    Silent Activations (estimate): {silents}""")
+            if chart_type == Pie:
+                put_html(m.stt_pie_chart().render_notebook())
             else:
-                md = f"""Device: {uuid}
-            
-            # Open Dataset Report"""
-
-            md += f"""
-            
-            Total Metrics submitted: {m.total_metrics}
-            Total WakeWords submitted: {m.total_ww}
-            Total Utterances submitted: {m.total_utt}"""
-
-            put_markdown(md)
-            put_html(m.optin_chart().render_notebook())
-    if opt == "devices":
-        with use_scope("main_view", clear=True):
+                put_html(m.stt_bar_chart().render_notebook())
+        elif selected_metric == "devices":
             md = f"""# Devices Report
-            Total Devices: {m.total_devices}
+                        Total Devices: {m.total_devices}
 
-            Total untracked: {len(m.untracked_devices)}
-            Total active (estimate): {len(m.active_devices)}
-            Total dormant (estimate): {len(m.dormant_devices)}"""
+                        Total untracked: {len(m.untracked_devices)}
+                        Total active (estimate): {len(m.active_devices)}
+                        Total dormant (estimate): {len(m.dormant_devices)}"""
             put_markdown(md)
-            put_html(m.device_chart().render_notebook())
-    if opt == "intents":
-        with use_scope("main_view", clear=True):
+            if chart_type == Pie:
+                put_html(m.devices_pie_chart().render_notebook())
+            else:
+                put_html(m.devices_bar_chart().render_notebook())
+        elif selected_metric == "intents":
             txt_estimate = max(m.total_intents + m.total_fallbacks - m.total_stt, 0)
             stt_estimate = max(m.total_intents + m.total_fallbacks - txt_estimate, 0)
-            if uuid is not None:
-                put_markdown(f"\nDevice: {uuid}")
             md = f"""# Intent Matches Report
-            Total queries: {m.total_intents + m.total_fallbacks}
-            
-            Total text queries (estimate): {txt_estimate}
-            Total speech queries (estimate): {stt_estimate}
-            
-            Total Matches: {m.total_intents}"""
+                        Total queries: {m.total_intents + m.total_fallbacks}
+
+                        Total text queries (estimate): {txt_estimate}
+                        Total speech queries (estimate): {stt_estimate}
+
+                        Total Matches: {m.total_intents}"""
             put_markdown(md)
-            put_html(m.intent_type_chart().render_notebook())
-    if opt == "ww":
-        bad = max(0, m.total_stt - m.total_ww)
-        silents = max(0, m.total_stt - m.total_utt)
-        with use_scope("main_view", clear=True):
-            if uuid is not None:
-                put_markdown(f"\nDevice: {uuid}\n\n")
+            if chart_type == Bar:
+                put_html(m.intents_bar_chart().render_notebook())
+            else:
+                put_html(m.intents_pie_chart().render_notebook())
+        elif selected_metric == "ww":
+            bad = max(0, m.total_stt - m.total_ww)
+            silents = max(0, m.total_stt - m.total_utt)
             put_markdown(f"""Total WakeWord uploads: {m.total_ww}
-            
+
             Total WakeWord detections (estimate): {m.total_stt}
             False Activations (estimate): {bad or silents}
             Silent Activations (estimate): {silents}""")
-            put_html(m.ww_chart().render_notebook())
-    if opt == "stt":
-        silents = max(0, m.total_stt - m.total_utt)
-        with use_scope("main_view", clear=True):
-            if uuid is not None:
-                put_markdown(f"\nDevice: {uuid}\n\n")
-            put_markdown(f"""Total Transcriptions: {m.total_stt}
-            Total Recording uploads: {m.total_utt}
-            
-            Silent Activations (estimate): {silents}""")
-            put_html(m.stt_type_chart().render_notebook())
-    if opt == "tts":
-        with use_scope("main_view", clear=True):
-            if uuid is not None:
-                put_markdown(f"\nDevice: {uuid}")
-            put_html(m.tts_type_chart().render_notebook())
-    if opt == "types":
-        with use_scope("main_view", clear=True):
-            if uuid is not None:
-                put_markdown(f"\nDevice: {uuid}")
+
+            if chart_type == Pie:
+                put_html(m.ww_pie_chart().render_notebook())
+            else:
+                put_html(m.ww_bar_chart().render_notebook())
+        elif selected_metric == "tts":
+            if chart_type == Pie:
+                put_html(m.tts_pie_chart().render_notebook())
+            else:
+                put_html(m.tts_bar_chart().render_notebook())
+        elif selected_metric == "types":
             put_markdown(f"""
         # Metrics Report
-        
+
         Total Intents: {m.total_intents}
         Total Fallbacks: {m.total_fallbacks}
         Total Transcriptions: {m.total_stt}
         Total TTS: {m.total_tts}
         """)
-            put_html(m.metrics_type_chart().render_notebook())
-    if opt == "fallback":
-        with use_scope("main_view", clear=True):
-            if uuid is not None:
-                put_markdown(f"\nDevice: {uuid}")
+            if chart_type == Pie:
+                put_html(m.metrics_type_pie_chart().render_notebook())
+            else:
+                put_html(m.metrics_type_bar_chart().render_notebook())
+        elif selected_metric == "fallback":
             f = 0
             if m.total_intents + m.total_fallbacks > 0:
                 f = m.total_intents / (m.total_intents + m.total_fallbacks)
@@ -194,10 +157,75 @@ def metrics_menu(back_handler=None, uuid=None):
 
                         Failure Percentage (estimate): {1 - f}
                         """)
-            put_html(m.fallback_type_chart().render_notebook())
-    if opt == "metrics":
+            if chart_type == Pie:
+                put_html(m.fallback_pie_chart().render_notebook())
+            else:
+                put_html(m.fallback_bar_chart().render_notebook())
+        elif selected_metric == "opt-in":
+            md = ""
+            if uuid is None:
+                md = f"""# Open Dataset Report
+            Total Registered Devices: {len(DeviceDatabase())}
+            Currently Opted-in: {len([d for d in DeviceDatabase() if d.opt_in])}
+            Unique Devices seen: {m.total_devices}"""
+
+            # Open Dataset Report"""
+
+            md += f"""
+
+            Total Metrics submitted: {m.total_metrics}
+            Total WakeWords submitted: {m.total_ww}
+            Total Utterances submitted: {m.total_utt}"""
+
+            put_markdown(md)
+            if chart_type == Pie:
+                put_html(m.dataset_pie_chart().render_notebook())
+            else:
+                put_html(m.dataset_bar_chart().render_notebook())
+
+
+def metrics_menu(back_handler=None, uuid=None, selected_metric="types"):
+    global chart_type
+
+    with use_scope("logo", clear=True):
+        img = open(f'{os.path.dirname(__file__)}/res/metrics.png', 'rb').read()
+        put_image(img)
+
+    _plot_metrics(uuid, selected_metric)
+
+    buttons = [{'label': 'Metric Types', 'value': "types"},
+               {'label': 'Intents', 'value': "intents"},
+               {'label': 'FallbackSkill', 'value': "fallback"},
+               {'label': 'STT', 'value': "stt"},
+               {'label': 'TTS', 'value': "tts"},
+               {'label': 'Wake Words', 'value': "ww"},
+               {'label': 'Open Dataset', 'value': "opt-in"}]
+    if chart_type == Pie:
+        buttons.append({'label': 'Bar style graphs', 'value': "chart"})
+    elif chart_type == Bar:
+        buttons.append({'label': 'Pie style graphs', 'value': "chart"})
+    if uuid is not None:
+        buttons.append({'label': 'Delete Device metrics', 'value': "delete_metrics"})
+    else:
+        buttons.insert(1, {'label': 'Devices', 'value': "devices"})
+        buttons.append({'label': 'Inspect Devices', 'value': "metrics"})
+        buttons.append({'label': 'Delete ALL metrics', 'value': "delete_metrics"})
+    if back_handler:
+        buttons.insert(0, {'label': '<- Go Back', 'value': "main"})
+
+    opt = actions(label="What would you like to do?",
+                  buttons=buttons)
+
+    if opt == "chart":
+        if chart_type == Pie:
+            chart_type = Bar
+        else:
+            chart_type = Pie
+    elif opt in ["devices", "intents", "stt", "ww", "tts", "types", "fallback", "opt-in"]:
+        selected_metric = opt
+    elif opt == "metrics":
         device_select(back_handler=back_handler)
-    if opt == "delete_metrics":
+    elif opt == "delete_metrics":
         if uuid is not None:
             with use_scope("main_view", clear=True):
                 put_markdown(f"\nDevice: {uuid}")
@@ -213,16 +241,18 @@ def metrics_menu(back_handler=None, uuid=None):
                 if back_handler:
                     back_handler()
         else:
-            metrics_menu(back_handler=back_handler, uuid=uuid)
+            metrics_menu(back_handler=back_handler, uuid=uuid,
+                         selected_metric=selected_metric)
         return
-    if opt == "main":
+    elif opt == "main":
         with use_scope("main_view", clear=True):
             if uuid is not None:
                 device_select(back_handler=back_handler)
             elif back_handler:
                 back_handler()
         return
-    metrics_menu(back_handler=back_handler, uuid=uuid)
+    metrics_menu(back_handler=back_handler, uuid=uuid,
+                 selected_metric=selected_metric)
 
 
 class MetricsReportGenerator:
@@ -242,6 +272,10 @@ class MetricsReportGenerator:
         self.tts = {}
         self.stt = {}
         self.devices = {}
+        self.intent_usage = {}
+
+        self.stt_timings = []
+
         self.load_metrics()
 
     @property
@@ -260,7 +294,7 @@ class MetricsReportGenerator:
     def untracked_devices(self):
         return [dev.uuid for dev in DeviceDatabase() if not dev.opt_in]
 
-    def device_chart(self):
+    def devices_pie_chart(self):
         chart = Pie("Devices")
         chart.set_options(
             labels=["active", "dormant", "untracked"],
@@ -271,7 +305,32 @@ class MetricsReportGenerator:
                           len(self.untracked_devices)])
         return chart
 
-    def ww_chart(self):
+    def devices_bar_chart(self):
+        chart = Bar("Devices")
+        chart.set_options(
+            labels=["active", "dormant", "untracked"],
+            x_label="Status", y_label="Number"
+        )
+        chart.add_series("Count", [len(self.active_devices),
+                                   len(self.dormant_devices),
+                                   len(self.untracked_devices)])
+        return chart
+
+    def ww_bar_chart(self):
+        chart = Bar("Wake Words")
+        labels = []
+        series = []
+        for ww, count in self.ww.items():
+            labels.append(ww)
+            series.append(count)
+
+        chart.set_options(
+            labels=labels, x_label="Wake Word", y_label="# Submitted"
+        )
+        chart.add_series("Count", series)
+        return chart
+
+    def ww_pie_chart(self):
         chart = Pie("Wake Words")
         labels = []
         series = []
@@ -286,7 +345,7 @@ class MetricsReportGenerator:
         chart.add_series(series)
         return chart
 
-    def optin_chart(self):
+    def dataset_pie_chart(self):
         chart = Pie("Uploaded Data")
         chart.set_options(
             labels=["wake-words", "utterances", "metrics"],
@@ -295,7 +354,28 @@ class MetricsReportGenerator:
         chart.add_series([self.total_ww, self.total_utt, self.total_metrics])
         return chart
 
-    def metrics_type_chart(self):
+    def dataset_bar_chart(self):
+        chart = Bar("Uploaded Data")
+        chart.set_options(
+            labels=["wake-words", "utterances", "metrics"],
+            x_label="Data Type", y_label="# Submitted"
+        )
+        chart.add_series("Count", [self.total_ww, self.total_utt, self.total_metrics])
+        return chart
+
+    def metrics_type_bar_chart(self):
+        chart = Bar("Metric Types")
+        chart.set_options(
+            labels=["intents", "fallbacks", "stt", "tts"],
+            x_label="Metric Type", y_label="# Submitted"
+        )
+        chart.add_series("Number", [self.total_intents,
+                                    self.total_fallbacks,
+                                    self.total_stt,
+                                    self.total_tts])
+        return chart
+
+    def metrics_type_pie_chart(self):
         chart = Pie("Metric Types")
         chart.set_options(
             labels=["intents", "fallbacks", "stt", "tts"],
@@ -307,7 +387,14 @@ class MetricsReportGenerator:
                           self.total_tts])
         return chart
 
-    def intent_type_chart(self):
+    def intents_bar_chart(self):
+        chart = Bar("Intent Matches")
+        chart.set_options(labels=list(self.intents.keys()),
+                          x_label="Intent Name", y_label="Times Triggered")
+        chart.add_series("Usage", list(self.intents.values()))
+        return chart
+
+    def intents_pie_chart(self):
         chart = Pie("Intent Matches")
         chart.set_options(
             labels=list(self.intents.keys()),
@@ -316,7 +403,16 @@ class MetricsReportGenerator:
         chart.add_series(list(self.intents.values()))
         return chart
 
-    def fallback_type_chart(self):
+    def fallback_bar_chart(self):
+        chart = Bar("Fallback Skills")
+        chart.set_options(
+            labels=list(self.fallbacks.keys()),
+            x_label="Fallback Handler", y_label="Times Triggered"
+        )
+        chart.add_series("Usage", list(self.fallbacks.values()))
+        return chart
+
+    def fallback_pie_chart(self):
         chart = Pie("Fallback Skills")
         chart.set_options(
             labels=list(self.fallbacks.keys()),
@@ -325,7 +421,16 @@ class MetricsReportGenerator:
         chart.add_series(list(self.fallbacks.values()))
         return chart
 
-    def tts_type_chart(self):
+    def tts_bar_chart(self):
+        chart = Bar("Text To Speech Engines")
+        chart.set_options(
+            labels=list(self.tts.keys()),
+            x_label="Engine", y_label="Times Triggered"
+        )
+        chart.add_series("Usage", list(self.tts.values()))
+        return chart
+
+    def tts_pie_chart(self):
         chart = Pie("Text To Speech Engines")
         chart.set_options(
             labels=list(self.tts.keys()),
@@ -334,7 +439,16 @@ class MetricsReportGenerator:
         chart.add_series(list(self.tts.values()))
         return chart
 
-    def stt_type_chart(self):
+    def stt_bar_chart(self):
+        chart = Bar("Speech To Text Engines")
+        chart.set_options(
+            labels=list(self.stt.keys()),
+            x_label="Engine", y_label="Times Triggered"
+        )
+        chart.add_series("Usage", list(self.stt.values()))
+        return chart
+
+    def stt_pie_chart(self):
         chart = Pie("Speech To Text Engines")
         chart.set_options(
             labels=list(self.stt.keys()),
@@ -377,12 +491,14 @@ class MetricsReportGenerator:
                 m["meta"]["time"] > self.devices[m["uuid"]]:
             self.devices[m["uuid"]] = m["meta"]["time"]
         if m["metric_type"] == "intent_service":
+            print(m)
             self.total_intents += 1
             k = f"{m['meta']['intent_type']}"
             if k not in self.intents:
                 self.intents[k] = 0
             self.intents[k] += 1
         if m["metric_type"] == "fallback_handler":
+            print(m)
             self.total_fallbacks += 1
             k = f"{m['meta']['handler']}"
             if m['meta'].get("skill_id"):
@@ -391,6 +507,12 @@ class MetricsReportGenerator:
                 self.fallbacks[k] = 0
             self.fallbacks[k] += 1
         if m["metric_type"] == "stt":
+            print(m)
+            start = m["meta"]["start_time"]
+            end = m["meta"]["time"]
+            duration = end - start
+            label = m["meta"]["transcription"]
+            self.stt_timings.append((start, duration, label))
             self.total_stt += 1
             k = f"{m['meta']['stt']}"
             if k not in self.stt:
@@ -402,6 +524,9 @@ class MetricsReportGenerator:
             if k not in self.tts:
                 self.tts[k] = 0
             self.tts[k] += 1
+
+        # sort by timestamp
+        self.stt_timings = sorted(self.stt_timings, key=lambda k: k[0], reverse=True)
 
 
 class DeviceMetricsReportGenerator(MetricsReportGenerator):
