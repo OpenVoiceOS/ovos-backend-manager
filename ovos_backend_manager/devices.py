@@ -61,27 +61,25 @@ def device_menu(uuid, back_handler=None):
     db = DeviceDatabase()
     device = db.get_device(uuid)
     if device:
+        y = False
         opt = actions(label="What would you like to do?",
                       buttons=buttons)
 
         if opt == "main":
             with use_scope("main_view", clear=True):
-                device_select(back_handler)
+                pass
+            device_select(back_handler=back_handler)
             return
-        if opt == "delete":
+        elif opt == "delete":
             with popup("Are you sure you want to delete the device?"):
                 put_text("this can not be undone, proceed with caution!")
-                opt = actions(label="Delete device?",
-                              buttons=[{'label': "yes", 'value': True},
-                                       {'label': "no", 'value': False}])
-                if opt:
+                y = actions(label="Delete device?",
+                            buttons=[{'label': "yes", 'value': True},
+                                     {'label': "no", 'value': False}])
+                if y:
                     db.delete_device(uuid)
                     db.store()
-                    device_select(back_handler)
-                    return
-                device_menu(uuid, back_handler=back_handler)
-                return
-        if opt == "opt-in":
+        elif opt == "opt-in":
             opt_in = checkbox("Open Dataset - device metrics and speech recordings",
                               [{'label': 'Store metrics and recordings',
                                 'selected': device.opt_in,
@@ -99,52 +97,50 @@ def device_menu(uuid, back_handler=None):
                 if uuid in CONFIGURATION["selene"]["opt_in_blacklist"]:
                     CONFIGURATION["selene"]["opt_in_blacklist"].remove(uuid)
                     CONFIGURATION.store()
-
-        if opt == "tts":
+        elif opt == "tts":
             tts = select("Choose a voice",
                          list(CONFIGURATION["tts_configs"].keys()))
             device.default_tts = CONFIGURATION["tts_configs"][tts]["module"]
             device.default_tts_cfg = CONFIGURATION["tts_configs"][tts]
-        if opt == "ww":
+        elif opt == "ww":
             ww = select("Choose a wake word",
                         list(CONFIGURATION["ww_configs"].keys()))
             device.default_ww = ww
             device.default_ww_cfg = CONFIGURATION["ww_configs"][ww]
-        if opt == "date":
+        elif opt == "date":
             date = select("Change date format",
                           ['DMY', 'MDY'])
             device.date_format = date
-        if opt == "time":
+        elif opt == "time":
             tim = select("Change time format",
                          ['full', 'short'])
             device.time_format = tim
-        if opt == "unit":
+        elif opt == "unit":
             unit = select("Change system units",
                           ['metric', 'imperial'])
             device.system_unit = unit
-        if opt == "email":
+        elif opt == "email":
             email = textarea("Enter your device email",
                              placeholder="notify@me.com",
                              required=True)
             device.email = email
-        if opt == "name":
+        elif opt == "name":
             name = textarea("Enter your device name",
                             placeholder="OVOS Mark2",
                             required=True)
             device.name = name
-        if opt == "location":
+        elif opt == "location":
             loc = textarea("Enter your device placement",
                            placeholder="kitchen",
                            required=True)
             device.device_location = loc
-        if opt == "geo":
+        elif opt == "geo":
             loc = textarea("Enter an address",
                            placeholder="Anywhere street Any city Nº234",
                            required=True)
             data = get_location_config(loc)
             device.location = data
-
-        if opt == "identity":
+        elif opt == "identity":
             identity = {"uuid": device.uuid,
                         "expires_at": time.time() + 99999999999999,
                         "accessToken": device.token,
@@ -152,20 +148,23 @@ def device_menu(uuid, back_handler=None):
             with use_scope("main_view", clear=True):
                 put_markdown(f'### identity2.json')
                 put_code(json.dumps(identity, indent=4), "json")
+        elif opt == "view_loc" or opt == "geo":
+            update_info(device, True)
         else:
-            if opt == "view_loc" or opt == "geo":
-                update_info(device, True)
-            else:
-                update_info(device, False)
+            update_info(device, False)
+
+        if opt not in ["identity", "delete", "view_loc"]:
             db.update_device(device)
             db.store()
-            if not opt.startswith("view"):
-                popup("Device updated!")
-
+            popup("Device updated!")
+        elif opt == "delete" and y:
+            uuid = None
         device_menu(uuid, back_handler=back_handler)
+
     else:
-        popup(f"Device not found! Please verify uuid")
-        device_select(back_handler)
+        with use_scope("main_view", clear=True):
+            pass
+        device_select(back_handler=back_handler)
 
 
 def device_select(back_handler=None):
