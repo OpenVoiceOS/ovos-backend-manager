@@ -7,8 +7,45 @@ from ovos_local_backend.configuration import CONFIGURATION
 from ovos_local_backend.database.settings import DeviceDatabase
 from ovos_local_backend.database.utterances import JsonUtteranceDatabase
 from ovos_local_backend.database.wakewords import JsonWakeWordDatabase
-from pywebio.input import actions, file_upload, input_group, textarea
-from pywebio.output import put_text, put_code, use_scope, put_markdown, popup, put_image, put_file, put_html
+from pywebio.input import actions, file_upload, input_group, textarea, select
+from pywebio.output import put_text, put_code, use_scope, put_markdown, popup, put_image, put_file, put_html, \
+    put_buttons, put_table
+
+
+def _render_ww(idx, db=None):
+    db = db or JsonWakeWordDatabase()
+
+    def on_tag(bt):
+        data["tag"] = bt
+        db[idx]["tag"] = bt
+        db.commit()
+        _render_ww(idx, db)
+
+    with use_scope("main_view", clear=True):
+        data = db[idx]  # id == db_position + 1
+        data["tag"] = data.get("tag") or "untagged"
+
+        if os.path.isfile(data["path"]):
+            content = open(data["path"], 'rb').read()
+            html = f"""
+            <audio controls src="data:audio/x-wav;base64,{b64encode(content).decode('ascii')}" />
+            """
+            put_table([
+                ['metadata', put_code(json.dumps(data, indent=4), "json")],
+                ['playback', put_html(html)],
+                ['file', put_file(data["path"].split("/")[-1], content, 'Download')],
+                ['classify', put_buttons(["wake_word", "speech", "noise", "silence"],
+                                         onclick=on_tag)]
+            ])
+
+        else:
+            put_table([
+                ['metadata', put_code(json.dumps(data, indent=4), "json")],
+                ['playback', put_markdown("**WARNING** - file not found")],
+                ['file', put_markdown("**WARNING** - file not found")],
+                ['classify', put_buttons(["untagged", "wake_word", "speech", "noise", "silence"],
+                                         onclick=on_tag)]
+            ])
 
 
 def ww_select(back_handler=None, uuid=None, ww=None):
@@ -41,19 +78,7 @@ def ww_select(back_handler=None, uuid=None, ww=None):
         ww_menu(back_handler=back_handler)
         return
 
-    with use_scope("main_view", clear=True):
-        data = db[opt - 1]  # id == db_position + 1
-        put_code(json.dumps(data, indent=4), "json")
-        if os.path.isfile(data["path"]):
-            content = open(data["path"], 'rb').read()
-            html = f"""
-            <audio controls src="data:audio/x-wav;base64,{b64encode(content).decode('ascii')}" />
-            """
-            put_html(html)
-            put_file(data["path"].split("/")[-1], content, 'Download Audio')
-
-        else:
-            put_markdown("**WARNING** - audio file not found")
+    _render_ww(opt - 1, db)
 
     ww_select(back_handler=back_handler, ww=ww, uuid=uuid)
 
@@ -175,6 +200,138 @@ def utt_opts(back_handler=None, uuid=None):
         utt_menu(back_handler=back_handler)
 
 
+def _render_ww_tagger(selected_idx, selected_wws, db=None, untagged_only=False):
+    db = db or JsonWakeWordDatabase()
+
+    def on_tag(tag):
+        nonlocal selected_idx, selected_wws
+
+        if all((ww.get("tag") != "untagged" for ww in selected_wws)):
+            popup("No more wake words to tag!")
+            if untagged_only:
+                return
+
+        if tag == "Skip ->":
+            selected_idx += 1
+            if selected_idx >= len(selected_wws):
+                selected_idx = 0
+            if untagged_only and selected_wws[selected_idx]["tag"] != "untagged":
+                return on_tag(tag)  # recurse
+
+        elif selected_idx is not None:
+            db_id = selected_wws[selected_idx]["wakeword_id"]
+            db[db_id]["tag"] = selected_wws[selected_idx]["tag"] = tag
+            db.commit()
+
+        _render_ww_tagger(selected_idx, selected_wws, db, untagged_only=untagged_only)
+
+    with use_scope("main_view", clear=True):
+        content = open(selected_wws[selected_idx]["path"], 'rb').read()
+        html = f"""
+        <audio controls src="data:audio/x-wav;base64,{b64encode(content).decode('ascii')}" />
+        """
+
+        put_table([
+            ['wake word', selected_wws[selected_idx]["transcription"]],
+            ['metadata', put_code(
+                json.dumps(selected_wws[selected_idx], indent=4), "json")],
+            ['playback', put_html(html)],
+            ['tag', put_buttons(["wake_word", "speech", "noise", "silence", "Skip ->"],
+                                onclick=on_tag)],
+        ])
+
+
+def ww_tagger(back_handler=None, selected_wws=None, selected_idx=None, untagged_only=True):
+    with use_scope("logo", clear=True):
+        img = open(f'{os.path.dirname(__file__)}/res/wakewords.png', 'rb').read()
+        put_image(img)
+
+    db = JsonWakeWordDatabase()
+
+    def get_next_untagged():
+        nonlocal selected_idx
+        if untagged_only:
+            for idx, ww in enumerate(selected_wws):
+                if ww.get("tag", "untagged") == "untagged":
+                    selected_idx = idx
+                    break
+            else:
+                selected_idx = 0
+
+    if not selected_wws:
+        wws = set([w["transcription"] for w in db
+                   if os.path.isfile(w["path"])])
+        if not len(wws):
+            with use_scope("main_view", clear=True):
+                put_text("No wake words uploaded yet!")
+            datasets_menu(back_handler=back_handler)
+            return
+        current_ww = select("Target WW", wws)
+        selected_wws = [w for w in db
+                        if w["transcription"] == current_ww
+                        and os.path.isfile(w["path"])]
+        selected_idx = 0
+    else:
+        selected_idx = selected_idx or 0
+        current_ww = selected_wws[selected_idx]["transcription"]
+        if untagged_only:
+            get_next_untagged()
+
+    # add "untagged" tag if needed
+    for idx, ww in enumerate(selected_wws):
+        if "tag" not in ww:
+            selected_wws[idx]["tag"] = "untagged"
+
+    _render_ww_tagger(selected_idx, selected_wws, db, untagged_only)
+
+    buttons = [
+        {'label': "Show all recordings" if untagged_only else 'Show untagged only', 'value': "toggle"},
+        {'label': f'Delete {current_ww} database', 'value': "delete_ww"}
+    ]
+
+    if back_handler:
+        buttons.insert(0, {'label': '<- Go Back', 'value': "main"})
+
+    opt = actions(label="What would you like to do?",
+                  buttons=buttons)
+
+    if opt == "toggle":
+        untagged_only = not untagged_only
+        get_next_untagged()
+
+    if opt == "delete_ww":
+        with use_scope("main_view", clear=True):
+            put_markdown(f"""Are you sure you want to delete the {current_ww} wake word database?
+            **this can not be undone**, proceed with caution!
+            **ALL** {current_ww} recordings will be **lost**""")
+        opt = actions(label=f"Delete {current_ww} database?",
+                      buttons=[{'label': "yes", 'value': True},
+                               {'label': "no", 'value': False}])
+        if opt:
+
+            for ww in selected_wws:
+                if os.path.isfile(ww["path"]):
+                    os.remove(ww["path"])
+                dbid = db.get_item_id(ww)
+                if dbid >= 0:
+                    db.remove_item(dbid)
+            db.commit()
+
+            with use_scope("main_view", clear=True):
+                put_text(f"{current_ww} database deleted!")
+        ww_tagger(back_handler=back_handler, untagged_only=untagged_only)
+        return
+
+    if opt == "main":
+        with use_scope("main_view", clear=True):
+            datasets_menu(back_handler=back_handler)
+        return
+    ww_tagger(back_handler=back_handler,
+              selected_idx=selected_idx,
+              selected_wws=selected_wws,
+              untagged_only=untagged_only)
+
+
 def ww_menu(back_handler=None):
     with use_scope("logo", clear=True):
         img = open(f'{os.path.dirname(__file__)}/res/wakewords.png', 'rb').read()
@@ -244,8 +401,13 @@ def ww_menu(back_handler=None):
                       buttons=[{'label': "yes", 'value': True},
                                {'label': "no", 'value': False}])
         if opt:
-            # TODO - also remove files from path
-            os.remove(JsonWakeWordDatabase().db.path)
+            # remove ww files from path
+            db = JsonWakeWordDatabase()
+            for ww in db:
+                if os.path.isfile(ww["path"]):
+                    os.remove(ww["path"])
+            # remove db itself
+            os.remove(db.db.path)
             with use_scope("main_view", clear=True):
                 put_text("wake word database deleted!")
         datasets_menu(back_handler=back_handler)
@@ -337,20 +499,24 @@ def datasets_menu(back_handler=None):
         img = open(f'{os.path.dirname(__file__)}/res/open_dataset.png', 'rb').read()
         put_image(img)
 
-    buttons = [{'label': 'Wake Words', 'value': "ww"},
-               {'label': 'Utterance Recordings', 'value': "utt"}
-               ]
+    buttons = [
+        {'label': 'Tag Wake Words', 'value': "dataset"},
+        {'label': 'Manage Wake Words', 'value': "ww"},
+        {'label': 'Manage Utterance Recordings', 'value': "utt"},
+    ]
     if back_handler:
         buttons.insert(0, {'label': '<- Go Back', 'value': "main"})
 
     opt = actions(label="What would you like to do?",
                   buttons=buttons)
 
-    if opt == "utt":
+    if opt == "dataset":
+        ww_tagger(back_handler=back_handler)
+    elif opt == "utt":
         utt_menu(back_handler=back_handler)
-    if opt == "ww":
+    elif opt == "ww":
         ww_menu(back_handler=back_handler)
-    if opt == "main":
+    elif opt == "main":
         with use_scope("main_view", clear=True):
             if back_handler:
                 back_handler()
