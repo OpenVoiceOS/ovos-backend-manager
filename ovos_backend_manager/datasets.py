@@ -225,6 +225,16 @@ def _render_ww_tagger(selected_idx, selected_wws, db=None, untagged_only=False):
 
         _render_ww_tagger(selected_idx, selected_wws, db, untagged_only=untagged_only)
 
+    def on_gender(tag):
+        nonlocal selected_idx, selected_wws
+
+        if selected_idx is not None:
+            db_id = selected_wws[selected_idx]["wakeword_id"]
+            db[db_id]["speaker_type"] = selected_wws[selected_idx]["speaker_type"] = tag
+            db.commit()
+
+        _render_ww_tagger(selected_idx, selected_wws, db, untagged_only=untagged_only)
+
     with use_scope("main_view", clear=True):
         content = open(selected_wws[selected_idx]["path"], 'rb').read()
         html = f"""
@@ -236,6 +246,8 @@ def _render_ww_tagger(selected_idx, selected_wws, db=None, untagged_only=False):
             ['metadata', put_code(
                 json.dumps(selected_wws[selected_idx], indent=4), "json")],
             ['playback', put_html(html)],
+            ['speaker type', put_buttons(["male", "female", "children"],
+                                         onclick=on_gender)],
             ['tag', put_buttons(["wake_word", "speech", "noise", "silence", "Skip ->"],
                                 onclick=on_tag)],
         ])
@@ -281,6 +293,8 @@ def ww_tagger(back_handler=None, selected_wws=None, selected_idx=None, untagged_
     for idx, ww in enumerate(selected_wws):
         if "tag" not in ww:
             selected_wws[idx]["tag"] = "untagged"
+        if "speaker_type" not in ww:
+            selected_wws[idx]["speaker_type"] = "untagged"
 
     _render_ww_tagger(selected_idx, selected_wws, db, untagged_only)
 
