@@ -280,6 +280,7 @@ class MetricsReportGenerator:
         self.tts_timings = []
         self.intent_timings = []
         self.fallback_timings = []
+        self.device_timings = []
 
         self.load_metrics()
 
@@ -304,6 +305,7 @@ class MetricsReportGenerator:
         self.tts_timings = []
         self.intent_timings = []
         self.fallback_timings = []
+        self.device_timings = []
 
     def load_metrics(self):
         self.reset_metrics()
@@ -449,7 +451,7 @@ class MetricsReportGenerator:
         chart = Bar("Intent Matches")
         chart.set_options(labels=list(self.intents.keys()),
                           x_label="Intent Name", y_label="Times Triggered")
-        chart.add_series("Usage", list(self.intents.values()))
+        chart.add_series("Count", list(self.intents.values()))
         return chart
 
     def intents_pie_chart(self):
@@ -467,7 +469,7 @@ class MetricsReportGenerator:
             labels=list(self.fallbacks.keys()),
             x_label="Fallback Handler", y_label="Times Triggered"
         )
-        chart.add_series("Usage", list(self.fallbacks.values()))
+        chart.add_series("Count", list(self.fallbacks.values()))
         return chart
 
     def fallback_pie_chart(self):
@@ -485,7 +487,7 @@ class MetricsReportGenerator:
             labels=list(self.tts.keys()),
             x_label="Engine", y_label="Times Triggered"
         )
-        chart.add_series("Usage", list(self.tts.values()))
+        chart.add_series("Count", list(self.tts.values()))
         return chart
 
     def tts_pie_chart(self):
@@ -503,7 +505,7 @@ class MetricsReportGenerator:
             labels=list(self.stt.keys()),
             x_label="Engine", y_label="Times Triggered"
         )
-        chart.add_series("Usage", list(self.stt.values()))
+        chart.add_series("Count", list(self.stt.values()))
         return chart
 
     def stt_pie_chart(self):
@@ -516,13 +518,13 @@ class MetricsReportGenerator:
         return chart
 
     def _process_metric(self, m):
+        start = m["meta"]["start_time"]
+        end = m["meta"]["time"]
+        duration = end - start
         if m["uuid"] not in self.devices or \
                 m["meta"]["time"] > self.devices[m["uuid"]]:
             self.devices[m["uuid"]] = m["meta"]["time"]
         if m["metric_type"] == "intent_service":
-            start = m["meta"]["start_time"]
-            end = m["meta"]["time"]
-            duration = end - start
             label = m["meta"]["intent_type"]
             self.intent_timings.append((start, duration, label))
             self.total_intents += 1
@@ -538,15 +540,9 @@ class MetricsReportGenerator:
             if k not in self.fallbacks:
                 self.fallbacks[k] = 0
             self.fallbacks[k] += 1
-            start = m["meta"]["start_time"]
-            end = m["meta"]["time"]
-            duration = end - start
             label = k
             self.fallback_timings.append((start, duration, label))
         if m["metric_type"] == "stt":
-            start = m["meta"]["start_time"]
-            end = m["meta"]["time"]
-            duration = end - start
             label = m["meta"]["transcription"]
             self.stt_timings.append((start, duration, label))
             self.total_stt += 1
@@ -555,9 +551,6 @@ class MetricsReportGenerator:
                 self.stt[k] = 0
             self.stt[k] += 1
         if m["metric_type"] == "speech":
-            start = m["meta"]["start_time"]
-            end = m["meta"]["time"]
-            duration = end - start
             label = m["meta"]["utterance"]
             self.tts_timings.append((start, duration, label))
             self.total_tts += 1
@@ -566,7 +559,10 @@ class MetricsReportGenerator:
                 self.tts[k] = 0
             self.tts[k] += 1
 
+        self.device_timings.append((start, duration, m["uuid"]))
+
         # sort by timestamp
+        self.device_timings = sorted(self.device_timings, key=lambda k: k[0], reverse=True)
         self.stt_timings = sorted(self.stt_timings, key=lambda k: k[0], reverse=True)
         self.tts_timings = sorted(self.tts_timings, key=lambda k: k[0], reverse=True)
         self.intent_timings = sorted(self.intent_timings, key=lambda k: k[0], reverse=True)

@@ -2,37 +2,37 @@ import json
 import os
 
 from ovos_local_backend.configuration import CONFIGURATION
+from ovos_plugin_manager.stt import get_stt_configs, get_stt_supported_langs, get_stt_lang_configs
 from pywebio.input import select, actions, input_group, input, TEXT, NUMBER
 from pywebio.output import put_text, put_table, popup, put_code, put_image, use_scope
 
-STT_CONFIGS = {
-    "OpenVoiceOS (google proxy)": {"module": "ovos-stt-plugin-server", "url": "https://stt.openvoiceos.com/stt"},
-    "Selene": {"module": "ovos-stt-plugin-selene", "url": "https://api.mycroft.ai"},
-    "Vosk (en-us) - small": {"module": "ovos-stt-plugin-vosk",
-                             "model": "http://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip"},
-    "Vosk (en-us) - large": {"module": "ovos-stt-plugin-vosk",
-                             "model": "https://alphacephei.com/vosk/models/vosk-model-en-us-aspire-0.2.zip"},
-    "Vosk (fr) - small": {"module": "ovos-stt-plugin-vosk",
-                          "model": "https://alphacephei.com/vosk/models/vosk-model-small-fr-pguyot-0.3.zip"},
-    "Vosk (fr) - large": {"module": "ovos-stt-plugin-vosk",
-                          "model": "https://github.com/pguyot/zamia-speech/releases/download/20190930/kaldi-generic-fr-tdnn_f-r20191016.tar.xz"},
-    "Vosk (de) - small": {"module": "ovos-stt-plugin-vosk",
-                          "model": "https://alphacephei.com/vosk/models/vosk-model-small-de-0.15.zip"},
-    "Vosk (de) - large": {"module": "ovos-stt-plugin-vosk",
-                          "model": "https://alphacephei.com/vosk/models/vosk-model-de-0.6.zip"},
-    "Vosk (es)": {"module": "ovos-stt-plugin-vosk",
-                  "model": "https://alphacephei.com/vosk/models/vosk-model-small-es-0.3.zip"},
-    "Vosk (pt)": {"module": "ovos-stt-plugin-vosk",
-                  "model": "https://alphacephei.com/vosk/models/vosk-model-small-pt-0.3.zip"},
-    "Vosk (it)": {"module": "ovos-stt-plugin-vosk",
-                  "model": "https://alphacephei.com/vosk/models/vosk-model-small-it-0.4.zip"},
-    "Vosk (ca)": {"module": "ovos-stt-plugin-vosk",
-                  "model": "https://alphacephei.com/vosk/models/vosk-model-small-ca-0.4.zip"},
-    "Vosk (nl) - small": {"module": "ovos-stt-plugin-vosk",
-                          "model": "https://alphacephei.com/vosk/models/vosk-model-nl-spraakherkenning-0.6-lgraph.zip"},
-    "Vosk (nl) - large": {"module": "ovos-stt-plugin-vosk",
-                          "model": "https://alphacephei.com/vosk/models/vosk-model-nl-spraakherkenning-0.6.zip"}
-}
+
+def _get_stt_opts(lang=None):
+    STT_CONFIGS = {}
+    if lang is not None:
+        for p, data in get_stt_lang_configs(lang, include_dialects=True).items():
+            if p == "ovos-stt-plugin-selene" and \
+                    not CONFIGURATION["selene"].get("enabled"):
+                continue
+            if not data:
+                continue
+            for cfg in data:
+                cfg["module"] = p
+                cfg["display_name"] = f"{cfg['display_name']} [{p}]"
+                STT_CONFIGS[cfg["display_name"]] = cfg
+    else:
+        for p, data in get_stt_configs().items():
+            if p == "ovos-stt-plugin-selene" and \
+                    not CONFIGURATION["selene"].get("enabled"):
+                continue
+            if not data:
+                continue
+            for lang, confs in data.items():
+                for cfg in confs:
+                    cfg["module"] = p
+                    cfg["display_name"] = f"{cfg['display_name']} [{p}]"
+                    STT_CONFIGS[cfg["display_name"]] = cfg
+    return STT_CONFIGS
 
 
 def microservices_menu(back_handler=None):
@@ -111,11 +111,12 @@ def microservices_menu(back_handler=None):
             with popup("OVOS microservices fallback disabled"):
                 put_text("please set your own wolfram alpha and weather keys")
     elif opt == "stt":
-        opts = list(STT_CONFIGS.keys())
-        if "Selene" in opts and not selene:
-            opts.remove("Selene")
+        lang = select("Choose STT default language",
+                      list(get_stt_supported_langs().keys()))
+        cfgs = _get_stt_opts(lang)
+        opts = list(cfgs.keys())
         stt = select("Choose a speech to text engine", opts)
-        cfg = dict(STT_CONFIGS[stt])
+        cfg = dict(cfgs[stt])
         m = cfg.pop("module")
         CONFIGURATION["stt"]["module"] = m
         CONFIGURATION["stt"][m] = cfg

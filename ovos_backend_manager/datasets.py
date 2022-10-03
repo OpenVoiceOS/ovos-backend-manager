@@ -207,8 +207,8 @@ def _render_ww_tagger(selected_idx, selected_wws, db=None, untagged_only=False):
         nonlocal selected_idx, selected_wws
 
         if all((ww.get("tag") != "untagged" for ww in selected_wws)):
-            popup("No more wake words to tag!")
             if untagged_only:
+                popup("No more wake words to tag!")
                 return
 
         if tag == "Skip ->":
