@@ -690,6 +690,7 @@ def _pair_device():
 
 
 def _main_menu():
+    popup("hello there!")
     opt = actions(label="What would you like to do?",
                   buttons=[{'label': 'Pair a device', 'value': "pair"},
                            {'label': 'Manage Devices', 'value': "device"},
