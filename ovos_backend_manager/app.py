@@ -1,62 +1,54 @@
-from ovos_local_backend.configuration import CONFIGURATION
-from pywebio.input import textarea, actions
-from pywebio.output import put_text, popup, use_scope, put_image
+import os
 
-from ovos_backend_manager.backend import backend_menu
-from ovos_backend_manager.datasets import datasets_menu
-from ovos_backend_manager.devices import device_select, instant_pair
-from ovos_backend_manager.metrics import metrics_menu
-from ovos_backend_manager.microservices import microservices_menu
-from ovos_backend_manager.selene import selene_menu
+import requests
+from flask import Flask, request
+from oauthlib.oauth2 import WebApplicationClient
+from ovos_local_backend.database.oauth import OAuthTokenDatabase, OAuthApplicationDatabase
+from pywebio.platform.flask import webio_view
 
+from ovos_backend_manager.menu import start
 
-def main_menu():
-    with use_scope("logo", clear=True):
-        from os.path import dirname
-        img = open(f'{dirname(__file__)}/res/personal_backend.png', 'rb').read()
-        put_image(img)
+os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
-    opt = actions(label="What would you like to do?",
-                  buttons=[{'label': 'Pair a device', 'value': "pair"},
-                           {'label': 'Manage Devices', 'value': "device"},
-                           {'label': 'Manage Metrics', 'value': "metrics"},
-                           {'label': 'Manage Datasets', 'value': "db"},
-                           {'label': 'Configure Backend', 'value': "backend"},
-                           {'label': 'Configure Microservices', 'value': "services"},
-                           {'label': 'Configure Selene Proxy', 'value': "selene"}])
-    if opt == "pair":
-        instant_pair(back_handler=main_menu)
-    elif opt == "services":
-        microservices_menu(back_handler=main_menu)
-    elif opt == "db":
-        datasets_menu(back_handler=main_menu)
-    elif opt == "backend":
-        backend_menu(back_handler=main_menu)
-    elif opt == "selene":
-        selene_menu(back_handler=main_menu)
-    elif opt == "device":
-        device_select(back_handler=main_menu)
-    elif opt == "metrics":
-        metrics_menu(back_handler=main_menu)
+app = Flask(__name__)
+
+# `task_func` is PyWebIO task function
+app.add_url_rule('/', 'webio_view', webio_view(start),
+                 methods=['GET', 'POST', 'OPTIONS'])  # need GET,POST and OPTIONS methods
 
 
-def prompt_admin_key():
-    admin_key = textarea("insert your admin_key, this should have been set in your backend configuration file",
-                         placeholder="SuperSecretPassword1!",
-                         required=True)
-    if CONFIGURATION["admin_key"] != admin_key:
-        popup("INVALID ADMIN KEY!")
-        prompt_admin_key()
+@app.route("/auth/callback/<oauth_id>", methods=['GET'])
+def oauth_callback(oauth_id):
+    """ user completed oauth, save token to db """
+    params = dict(request.args)
+    code = params["code"]
+
+    data = OAuthApplicationDatabase()[oauth_id]
+    client_id = data["client_id"]
+    client_secret = data["client_secret"]
+    token_endpoint = data["token_endpoint"]
+
+    # Prepare and send a request to get tokens! Yay tokens!
+    client = WebApplicationClient(client_id)
+    token_url, headers, body = client.prepare_token_request(
+        token_endpoint,
+        authorization_response=request.url,
+        redirect_url=request.base_url,
+        code=code
+    )
+    token_response = requests.post(
+        token_url,
+        headers=headers,
+        data=body,
+        auth=(client_id, client_secret),
+    ).json()
+
+    with OAuthTokenDatabase() as db:
+        db.add_token(oauth_id, token_response)
+
+    return params
 
 
-def app():
-    if not CONFIGURATION["admin_key"]:
-        put_text("This personal backend instance does not have the admin interface exposed")
-        exit(1)
-    with use_scope("logo", clear=True):
-        from os.path import dirname
-        img = open(f'{dirname(__file__)}/res/personal_backend.png', 'rb').read()
-        put_image(img)
-
-    prompt_admin_key()
-    main_menu()
+def main(port=36535, debug=False):
+    app.run(port=port, debug=debug)
+    # start_server(app, port=port, debug=debug)
