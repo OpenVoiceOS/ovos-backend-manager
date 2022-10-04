@@ -1,4 +1,5 @@
 import os
+
 from setuptools import setup
 
 BASEDIR = os.path.abspath(os.path.dirname(__file__))
@@ -55,11 +56,11 @@ setup(
     install_requires=required("requirements.txt"),
     package_data={'': package_files('ovos_backend_manager')},
     include_package_data=True,
-    url='https://github.com/OpenVoiceOS/ovos-personal-backend-ui',
+    url='https://github.com/OpenVoiceOS/ovos-backend-manager',
     license='Apache-2.0',
     author='jarbasAI',
     author_email='jarbasai@mailfence.com',
-    description='UI for OpenVoiceOS personal backend',
+    description='UI to manage OpenVoiceOS backends',
     entry_points={
         'console_scripts': [
             'ovos-backend-manager=ovos_backend_manager.__main__:main'

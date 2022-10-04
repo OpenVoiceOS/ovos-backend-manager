@@ -1,6 +1,9 @@
 # ovos backend UI
 
-a simple UI for [OVOS-local-backend](https://github.com/OpenVoiceOS/OVOS-local-backend), utility to manage all your devices
+a simple UI for [OVOS-personal-backend](https://github.com/OpenVoiceOS/ovos-personal-backend), utility to manage all
+your devices
+
+If you are running ovos-core without a backend you can also use this UI to view metrics, tag wake words and handle OAuth
 
 ![](./screenshots/demo.gif)
 
@@ -10,7 +13,7 @@ a simple UI for [OVOS-local-backend](https://github.com/OpenVoiceOS/OVOS-local-b
 
 or from source
 
-`pip install git+https://github.com/OpenVoiceOS/ovos-personal-backend-ui`
+`pip install git+https://github.com/OpenVoiceOS/ovos-backend-manager`
 
 ## Usage
 
