@@ -3,7 +3,7 @@ import os
 import requests
 from flask import Flask, request
 from oauthlib.oauth2 import WebApplicationClient
-from ovos_local_backend.database.oauth import OAuthTokenDatabase, OAuthApplicationDatabase
+from ovos_backend_client.database import OAuthTokenDatabase, OAuthApplicationDatabase
 from pywebio.platform.flask import webio_view
 
 from ovos_backend_manager.menu import start

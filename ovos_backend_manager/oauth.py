@@ -3,7 +3,7 @@ import os
 
 from oauthlib.oauth2 import WebApplicationClient
 from ovos_local_backend.configuration import CONFIGURATION
-from ovos_local_backend.database.oauth import OAuthApplicationDatabase, OAuthTokenDatabase
+from ovos_backend_client.database import OAuthTokenDatabase, OAuthApplicationDatabase
 from pywebio.input import actions, input_group, input, TEXT
 from pywebio.output import use_scope, popup, put_image, put_link, put_code, put_text, put_table, put_markdown
 
