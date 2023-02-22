@@ -50,5 +50,5 @@ def oauth_callback(oauth_id):
 
 
 def main(port=36535, debug=False):
-    app.run(host=0.0.0.0, port=port, debug=debug)
+    app.run(host="0.0.0.0", port=port, debug=debug)
     # start_server(app, port=port, debug=debug)
