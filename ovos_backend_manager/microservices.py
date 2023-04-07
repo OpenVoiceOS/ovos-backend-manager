@@ -1,7 +1,7 @@
 import json
 import os
 
-from ovos_local_backend.configuration import CONFIGURATION
+from ovos_backend_manager.configuration import CONFIGURATION
 from ovos_plugin_manager.stt import get_stt_configs, get_stt_supported_langs, get_stt_lang_configs
 from pywebio.input import select, actions, input_group, input, TEXT, NUMBER
 from pywebio.output import put_text, put_table, popup, put_code, put_image, use_scope
@@ -11,8 +11,7 @@ def _get_stt_opts(lang=None):
     STT_CONFIGS = {}
     if lang is not None:
         for p, data in get_stt_lang_configs(lang, include_dialects=True).items():
-            if p == "ovos-stt-plugin-selene" and \
-                    not CONFIGURATION["selene"].get("enabled"):
+            if p == "ovos-stt-plugin-selene":
                 continue
             if not data:
                 continue
@@ -22,8 +21,7 @@ def _get_stt_opts(lang=None):
                 STT_CONFIGS[cfg["display_name"]] = cfg
     else:
         for p, data in get_stt_configs().items():
-            if p == "ovos-stt-plugin-selene" and \
-                    not CONFIGURATION["selene"].get("enabled"):
+            if p == "ovos-stt-plugin-selene":
                 continue
             if not data:
                 continue
@@ -40,8 +38,6 @@ def microservices_menu(back_handler=None):
         img = open(f'{os.path.dirname(__file__)}/res/microservices_config.png', 'rb').read()
         put_image(img)
 
-    selene = CONFIGURATION["selene"]["enabled"]
-
     with use_scope("main_view", clear=True):
         put_table([
             ['STT module', CONFIGURATION["stt"]["module"]],
@@ -49,12 +45,7 @@ def microservices_menu(back_handler=None):
 
             ['WolframAlpha provider', CONFIGURATION["microservices"]["wolfram_provider"]],
             ['Weather provider', CONFIGURATION["microservices"]["weather_provider"]],
-            ['Geolocation provider', CONFIGURATION["microservices"]["geolocation_provider"]],
-
-            ['Selene WolframAlpha proxy enabled', selene and CONFIGURATION["selene"]["proxy_wolfram"]],
-            ['Selene OpenWeatherMap proxy enabled', selene and CONFIGURATION["selene"]["proxy_weather"]],
-            ['Selene Geolocation proxy enabled', selene and CONFIGURATION["selene"]["proxy_geolocation"]],
-            ['Selene Email proxy enabled', selene and CONFIGURATION["selene"]["proxy_email"]]
+            ['Geolocation provider', CONFIGURATION["microservices"]["geolocation_provider"]]
         ])
 
     buttons = [{'label': 'Configure STT', 'value': "stt"},
@@ -79,8 +70,6 @@ def microservices_menu(back_handler=None):
         return
     elif opt == "geo":
         opts = ["OpenStreetMap", "ArcGIS", "Geocode Farm"]  # TODO - ovos endpoint
-        if selene and CONFIGURATION["selene"]["proxy_geolocation"]:
-            opts.append("Selene")
         provider = select("Choose a weather provider", opts)
         if provider == "OpenStreetMap":
             provider = "osm"
@@ -89,16 +78,12 @@ def microservices_menu(back_handler=None):
         opts = ["ovos"]
         if CONFIGURATION["microservices"]["owm_key"]:
             opts.append("local")
-        if selene and CONFIGURATION["selene"]["proxy_weather"]:
-            opts.append("selene")
         provider = select("Choose a weather provider", opts)
         CONFIGURATION["microservices"]["weather_provider"] = provider
     elif opt == "wolfram":
         opts = ["ovos"]
         if CONFIGURATION["microservices"]["wolfram_key"]:
             opts.append("local")
-        if selene and CONFIGURATION["selene"]["proxy_wolfram"]:
-            opts.append("selene")
         provider = select("Choose a WolframAlpha provider", opts)
         CONFIGURATION["microservices"]["wolfram_provider"] = provider
     elif opt == "ovos":
@@ -133,7 +118,6 @@ def microservices_menu(back_handler=None):
         CONFIGURATION["microservices"]["owm_key"] = data["owm"]
         popup("Secrets updated!")
     elif opt == "smtp":
-        # TODO - checkbox for selene proxy
         # TODO - ovos endpoint
 
         if "smtp" not in CONFIGURATION["email"]:

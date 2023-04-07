@@ -1,4 +1,4 @@
-from ovos_local_backend.configuration import CONFIGURATION
+from ovos_backend_manager.configuration import CONFIGURATION
 from pywebio.input import textarea, actions
 from pywebio.output import put_text, popup, use_scope, put_image
 
@@ -8,7 +8,6 @@ from ovos_backend_manager.devices import device_select, instant_pair
 from ovos_backend_manager.metrics import metrics_menu
 from ovos_backend_manager.microservices import microservices_menu
 from ovos_backend_manager.oauth import oauth_menu
-from ovos_backend_manager.selene import selene_menu
 
 
 def main_menu():
@@ -24,8 +23,7 @@ def main_menu():
                            {'label': 'Manage Datasets', 'value': "db"},
                            {'label': 'OAuth Applications', 'value': "oauth"},
                            {'label': 'Configure Backend', 'value': "backend"},
-                           {'label': 'Configure Microservices', 'value': "services"},
-                           {'label': 'Configure Selene Proxy', 'value': "selene"}])
+                           {'label': 'Configure Microservices', 'value': "services"}])
     if opt == "pair":
         instant_pair(back_handler=main_menu)
     elif opt == "services":
@@ -36,8 +34,6 @@ def main_menu():
         datasets_menu(back_handler=main_menu)
     elif opt == "backend":
         backend_menu(back_handler=main_menu)
-    elif opt == "selene":
-        selene_menu(back_handler=main_menu)
     elif opt == "device":
         device_select(back_handler=main_menu)
     elif opt == "metrics":

@@ -1,8 +1,8 @@
 import json
 import os
 
-from ovos_local_backend.configuration import CONFIGURATION
-from ovos_local_backend.utils.geolocate import get_location_config
+from ovos_backend_manager.configuration import CONFIGURATION
+from ovos_backend_client.api import GeolocationApi
 from pywebio.input import textarea, select, actions
 from pywebio.output import put_table, put_markdown, popup, put_code, put_image, use_scope
 
@@ -18,7 +18,6 @@ def backend_menu(back_handler=None):
             ['Device Authentication enabled', not CONFIGURATION["skip_auth"]],
             ['Location override enabled', CONFIGURATION["override_location"]],
             ['IP Geolocation enabled', CONFIGURATION["geolocate"]],
-            ['Selene Proxy enabled', CONFIGURATION["selene"]["enabled"]],
             ['Default TTS', CONFIGURATION["default_tts"]],
             ['Default Wake Word', CONFIGURATION["default_ww"]],
             ['Default date format', CONFIGURATION["date_format"]],
@@ -76,7 +75,7 @@ def backend_menu(back_handler=None):
         loc = textarea("Enter an address",
                        placeholder="Anywhere street Any city Nº234",
                        required=True)
-        data = get_location_config(loc)
+        data = GeolocationApi().get_geolocation(loc)
         CONFIGURATION["default_location"] = data
         with popup(f"Default location set to: {loc}"):
             put_code(json.dumps(data, ensure_ascii=True, indent=2), "json")

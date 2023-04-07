@@ -3,10 +3,8 @@ import os
 import time
 
 from cutecharts.charts import Pie, Bar, Scatter
-from ovos_local_backend.database.metrics import JsonMetricDatabase
-from ovos_local_backend.database.settings import DeviceDatabase
-from ovos_local_backend.database.utterances import JsonUtteranceDatabase
-from ovos_local_backend.database.wakewords import JsonWakeWordDatabase
+
+from ovos_backend_manager.configuration import CONFIGURATION, DB
 from pywebio.input import actions
 from pywebio.output import put_text, popup, put_code, put_markdown, put_html, use_scope, put_image
 
@@ -14,8 +12,8 @@ chart_type = Pie
 
 
 def device_select(back_handler=None):
-    devices = {uuid: f"{device['name']}@{device['device_location']}"
-               for uuid, device in DeviceDatabase().items()}
+    devices = {device["uuid"]: f"{device['name']}@{device['device_location']}"
+               for device in DB.list_devices()}
     buttons = [{'label': "All Devices", 'value': "all"}] + \
               [{'label': d, 'value': uuid} for uuid, d in devices.items()]
     if back_handler:
@@ -41,29 +39,29 @@ def device_select(back_handler=None):
 
 def metrics_select(back_handler=None, uuid=None):
     buttons = []
-    db = JsonMetricDatabase()
-    if not len(db):
+    metrics = DB.list_metrics()
+    if not len(metrics):
         with use_scope("main_view", clear=True):
             put_text("No metrics uploaded yet!")
         metrics_menu(back_handler=back_handler, uuid=uuid)
         return
 
-    for m in db:
+    for m in metrics:
         name = f"{m['metric_id']}-{m['metric_type']}"
         if uuid is not None and m["uuid"] != uuid:
             continue
         buttons.append({'label': name, 'value': m['metric_id']})
     if back_handler:
         buttons.insert(0, {'label': '<- Go Back', 'value': "main"})
-    opt = actions(label="Select a metric to inspect",
+    metric_id = actions(label="Select a metric to inspect",
                   buttons=buttons)
-    if opt == "main":
+    if metric_id == "main":
         device_select(back_handler=back_handler)
         return
-    # id == db_position + 1
+
     with use_scope("main_view", clear=True):
         put_markdown("# Metadata")
-        put_code(json.dumps(db[opt - 1], indent=4), "json")
+        put_code(json.dumps(metric_id, indent=4), "json")
     metrics_select(back_handler=back_handler, uuid=uuid)
 
 
@@ -167,8 +165,8 @@ def _plot_metrics(uuid, selected_metric="types"):
             md = ""
             if uuid is None:
                 md = f"""# Open Dataset Report
-            Total Registered Devices: {len(DeviceDatabase())}
-            Currently Opted-in: {len([d for d in DeviceDatabase() if d.opt_in])}
+            Total Registered Devices: {len(DB.list_devices())}
+            Currently Opted-in: {len([d for d in DB.list_devices() if d["opt_in"]])}
             Unique Devices seen: {m.total_devices}"""
 
             # Open Dataset Report"""
@@ -239,7 +237,9 @@ def metrics_menu(back_handler=None, uuid=None, selected_metric="types"):
                       buttons=[{'label': "yes", 'value': True},
                                {'label': "no", 'value': False}])
         if opt:
-            os.remove(JsonMetricDatabase().db.path)
+            for m in DB.list_metrics():
+                DB.delete_metric(m["metric_id"])
+
             with use_scope("main_view", clear=True):
                 if back_handler:
                     back_handler()
@@ -264,10 +264,10 @@ class MetricsReportGenerator:
         self.total_fallbacks = 0
         self.total_stt = 0
         self.total_tts = 0
-        self.total_ww = len(JsonWakeWordDatabase())
-        self.total_utt = len(JsonUtteranceDatabase())
-        self.total_devices = len(DeviceDatabase())
-        self.total_metrics = len(JsonMetricDatabase())
+        self.total_ww = len(DB.list_ww_recordings())
+        self.total_utt = len(DB.list_stt_recordings())
+        self.total_devices = len(DB.list_devices())
+        self.total_metrics = len(DB.list_metrics())
 
         self.intents = {}
         self.fallbacks = {}
@@ -289,10 +289,10 @@ class MetricsReportGenerator:
         self.total_fallbacks = 0
         self.total_stt = 0
         self.total_tts = 0
-        self.total_ww = len(JsonWakeWordDatabase())
-        self.total_metrics = len(JsonMetricDatabase())
-        self.total_utt = len(JsonUtteranceDatabase())
+        self.total_ww = len(DB.list_ww_recordings())
+        self.total_utt = len(DB.list_stt_recordings())
         self.total_devices = 0
+        self.total_metrics = len(DB.list_metrics())
 
         self.intents = {}
         self.devices = {}
@@ -309,11 +309,11 @@ class MetricsReportGenerator:
 
     def load_metrics(self):
         self.reset_metrics()
-        for m in JsonMetricDatabase():
+        for m in DB.list_metrics():
             if m["uuid"] not in self.devices:
                 self.total_devices += 1
             self._process_metric(m)
-        for ww in JsonWakeWordDatabase():
+        for ww in DB.list_ww_recordings():
             if ww["meta"]["name"] not in self.ww:
                 self.ww[ww["meta"]["name"]] = 0
             else:
@@ -333,7 +333,7 @@ class MetricsReportGenerator:
 
     @property
     def untracked_devices(self):
-        return [dev.uuid for dev in DeviceDatabase() if not dev.opt_in]
+        return [dev["uuid"] for dev in DB.list_devices() if not dev["opt_in"]]
 
     # cute charts
     def timings_chart(self):
@@ -577,18 +577,18 @@ class DeviceMetricsReportGenerator(MetricsReportGenerator):
     def load_metrics(self):
         self.reset_metrics()
 
-        self.total_ww = len([ww for ww in JsonWakeWordDatabase()
+        self.total_ww = len([ww for ww in DB.list_ww_recordings()
                              if ww["uuid"] == self.uuid])
         self.total_metrics = 0
-        self.total_utt = len([utt for utt in JsonUtteranceDatabase()
+        self.total_utt = len([utt for utt in DB.list_stt_recordings()
                               if utt["uuid"] == self.uuid])
 
-        for m in JsonMetricDatabase():
+        for m in DB.list_metrics():
             if m["uuid"] != self.uuid:
                 continue
             self._process_metric(m)
             self.total_metrics += 1
-        for ww in JsonWakeWordDatabase():
+        for ww in DB.list_ww_recordings():
             if ww["uuid"] != self.uuid:
                 continue
             if ww["meta"]["name"] not in self.ww:
@@ -598,5 +598,5 @@ class DeviceMetricsReportGenerator(MetricsReportGenerator):
 
 
 if __name__ == "__main__":
-    for ww in JsonWakeWordDatabase():
+    for ww in DB.list_ww_recordings():
         print(ww)

@@ -3,10 +3,9 @@ import os
 import time
 from uuid import uuid4
 
-from ovos_local_backend.configuration import CONFIGURATION
-from ovos_local_backend.database.settings import DeviceDatabase
-from ovos_local_backend.utils import generate_code
-from ovos_local_backend.utils.geolocate import get_location_config
+from ovos_backend_manager.configuration import CONFIGURATION, DB
+import random
+from ovos_backend_client.api import GeolocationApi
 from pywebio.input import textarea, select, actions, checkbox
 from pywebio.output import put_text, put_table, put_markdown, popup, put_code, use_scope, put_image
 
@@ -52,14 +51,12 @@ def device_menu(uuid, back_handler=None):
                     ['Time Format', d.time_format],
                     ['System Unit', d.system_unit],
                     ['Opt In', d.opt_in],
-                    ['Selene Blocked', uuid in CONFIGURATION["selene"]["opt_in_blacklist"]],
                     ['Lang', d.lang],
                     ['Default Wake Word', d.default_ww],
                     ['Default Voice', d.default_tts]
                 ])
 
-    db = DeviceDatabase()
-    device = db.get_device(uuid)
+    device = DB.get_device(uuid)
     if device:
         y = False
         opt = actions(label="What would you like to do?",
@@ -77,74 +74,63 @@ def device_menu(uuid, back_handler=None):
                             buttons=[{'label': "yes", 'value': True},
                                      {'label': "no", 'value': False}])
                 if y:
-                    db.delete_device(uuid)
-                    db.store()
+                    DB.delete_device(uuid)
         elif opt == "opt-in":
             opt_in = checkbox("Open Dataset - device metrics and speech recordings",
                               [{'label': 'Store metrics and recordings',
                                 'selected': device.opt_in,
-                                'value': "opt_in"},
-                               {'label': 'Block Selene sharing',
-                                'selected': uuid in CONFIGURATION["selene"]["opt_in_blacklist"],
-                                'value': "blacklist"}])
+                                'value': "opt_in"}])
 
-            device.opt_in = "opt_in" in opt_in
-            if "blacklist" in opt_in:
-                if uuid not in CONFIGURATION["selene"]["opt_in_blacklist"]:
-                    CONFIGURATION["selene"]["opt_in_blacklist"].append(uuid)
-                    CONFIGURATION.store()
-            else:
-                if uuid in CONFIGURATION["selene"]["opt_in_blacklist"]:
-                    CONFIGURATION["selene"]["opt_in_blacklist"].remove(uuid)
-                    CONFIGURATION.store()
+            device["opt_in"] = "opt_in" in opt_in
+
         elif opt == "tts":
             tts = select("Choose a voice",
                          list(CONFIGURATION["tts_configs"].keys()))
-            device.default_tts = CONFIGURATION["tts_configs"][tts]["module"]
-            device.default_tts_cfg = CONFIGURATION["tts_configs"][tts]
+            device["default_tts"] = CONFIGURATION["tts_configs"][tts]["module"]
+            device["default_tts_cfg"] = CONFIGURATION["tts_configs"][tts]
         elif opt == "ww":
             ww = select("Choose a wake word",
                         list(CONFIGURATION["ww_configs"].keys()))
-            device.default_ww = ww
-            device.default_ww_cfg = CONFIGURATION["ww_configs"][ww]
+            device["default_ww"] = ww
+            device["default_ww_cfg"] = CONFIGURATION["ww_configs"][ww]
         elif opt == "date":
             date = select("Change date format",
                           ['DMY', 'MDY'])
-            device.date_format = date
+            device["date_format"] = date
         elif opt == "time":
             tim = select("Change time format",
                          ['full', 'short'])
-            device.time_format = tim
+            device["time_format"] = tim
         elif opt == "unit":
             unit = select("Change system units",
                           ['metric', 'imperial'])
-            device.system_unit = unit
+            device["system_unit"] = unit
         elif opt == "email":
             email = textarea("Enter your device email",
                              placeholder="notify@me.com",
                              required=True)
-            device.email = email
+            device["email"] = email
         elif opt == "name":
             name = textarea("Enter your device name",
                             placeholder="OVOS Mark2",
                             required=True)
-            device.name = name
+            device["name"] = name
         elif opt == "location":
             loc = textarea("Enter your device placement",
                            placeholder="kitchen",
                            required=True)
-            device.device_location = loc
+            device["device_location"] = loc
         elif opt == "geo":
             loc = textarea("Enter an address",
                            placeholder="Anywhere street Any city Nº234",
                            required=True)
-            data = get_location_config(loc)
-            device.location = data
+            data = GeolocationApi().get_geolocation(loc)
+            device["location"] = data
         elif opt == "identity":
-            identity = {"uuid": device.uuid,
+            identity = {"uuid": device["uuid"],
                         "expires_at": time.time() + 99999999999999,
-                        "accessToken": device.token,
-                        "refreshToken": device.token}
+                        "accessToken": device["token"],
+                        "refreshToken": device["token"]}
             with use_scope("main_view", clear=True):
                 put_markdown(f'### identity2.json')
                 put_code(json.dumps(identity, indent=4), "json")
@@ -154,8 +140,7 @@ def device_menu(uuid, back_handler=None):
             update_info(device, False)
 
         if opt not in ["identity", "delete", "view_loc"]:
-            db.update_device(device)
-            db.store()
+            DB.update_device(**device)
             popup("Device updated!")
         elif opt == "delete" and y:
             uuid = None
@@ -172,8 +157,8 @@ def device_select(back_handler=None):
         img = open(f'{os.path.dirname(__file__)}/res/devices.png', 'rb').read()
         put_image(img)
 
-    devices = {uuid: f"{device['name']}@{device['device_location']}"
-               for uuid, device in DeviceDatabase().items()}
+    devices = {device["uuid"]: f"{device['name']}@{device['device_location']}"
+               for device in DB.list_devices()}
     buttons = [{'label': d, 'value': uuid} for uuid, d in devices.items()] + \
               [{'label': 'Delete device database', 'value': "delete_devices"}]
     if back_handler:
@@ -195,7 +180,9 @@ def device_select(back_handler=None):
                           buttons=[{'label': "yes", 'value': True},
                                    {'label': "no", 'value': False}])
             if opt:
-                os.remove(DeviceDatabase().path)
+                for dev in DB.list_devices():
+                    DB.delete_device(dev["uuid"])
+
                 with use_scope("main_view", clear=True):
                     if back_handler:
                         back_handler()
@@ -218,11 +205,11 @@ def instant_pair(back_handler=None):
         put_image(img)
 
     uuid = str(uuid4())
-    code = generate_code()
+    code = f"{random.randint(100, 999)}ABC"
     token = f"{code}:{uuid}"
+
     # add device to db
-    with DeviceDatabase() as db:
-        db.add_device(uuid, token)
+    DB.add_device(uuid, token)
 
     with use_scope("main_view", clear=True):
         put_markdown("# Device paired!")
