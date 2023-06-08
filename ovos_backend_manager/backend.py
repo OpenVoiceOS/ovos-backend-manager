@@ -14,28 +14,28 @@ def backend_menu(back_handler=None):
 
     with use_scope("main_view", clear=True):
         put_table([
-            ['Backend Port', CONFIGURATION["backend_port"]],
-            ['Device Authentication enabled', not CONFIGURATION["skip_auth"]],
-            ['Location override enabled', CONFIGURATION["override_location"]],
-            ['IP Geolocation enabled', CONFIGURATION["geolocate"]],
-            ['Default TTS', CONFIGURATION["default_tts"]],
-            ['Default Wake Word', CONFIGURATION["default_ww"]],
+            ['Backend Port', CONFIGURATION["server"]["port"]],
+            ['Device Authentication enabled', not CONFIGURATION["server"]["skip_auth"]],
+            ['Location override enabled', CONFIGURATION["server"]["override_location"]],
+            ['IP Geolocation enabled', CONFIGURATION["server"]["geolocate"]],
+            ['Default TTS', CONFIGURATION["tts"]["module"]],
+            ['Default Wake Word', CONFIGURATION["listener"]["wake_word"]],
             ['Default date format', CONFIGURATION["date_format"]],
             ['Default time format', CONFIGURATION["time_format"]],
             ['Default system units', CONFIGURATION["system_unit"]]
         ])
         put_markdown(f'### Default location:')
         put_table([
-            ['Timezone Code', CONFIGURATION["default_location"]["timezone"]["code"]],
-            ['City', CONFIGURATION["default_location"]["city"]["name"]],
-            ['State', CONFIGURATION["default_location"]["city"]["state"]["name"]],
-            ['Country', CONFIGURATION["default_location"]["city"]["state"]["country"]["name"]],
-            ['Country Code', CONFIGURATION["default_location"]["city"]["state"]["country"]["code"]],
-            ['Latitude', CONFIGURATION["default_location"]["coordinate"]["latitude"]],
-            ['Longitude', CONFIGURATION["default_location"]["coordinate"]["longitude"]]
+            ['Timezone Code', CONFIGURATION["location"]["timezone"]["code"]],
+            ['City', CONFIGURATION["location"]["city"]["name"]],
+            ['State', CONFIGURATION["location"]["city"]["state"]["name"]],
+            ['Country', CONFIGURATION["location"]["city"]["state"]["country"]["name"]],
+            ['Country Code', CONFIGURATION["location"]["city"]["state"]["country"]["code"]],
+            ['Latitude', CONFIGURATION["location"]["coordinate"]["latitude"]],
+            ['Longitude', CONFIGURATION["location"]["coordinate"]["longitude"]]
         ])
 
-    auth = 'Enable device auth' if not CONFIGURATION["skip_auth"] else 'Disable device auth'
+    auth = 'Enable device auth' if not CONFIGURATION["server"]["skip_auth"] else 'Disable device auth'
 
     buttons = [{'label': auth, 'value': "auth"},
                {'label': 'Set default location', 'value': "geo"},
@@ -49,7 +49,7 @@ def backend_menu(back_handler=None):
     if back_handler:
         buttons.insert(0, {'label': '<- Go Back', 'value': "main"})
 
-    if CONFIGURATION["override_location"]:
+    if CONFIGURATION["server"]["override_location"]:
         buttons.insert(-2, {'label': 'Enable IP geolocation', 'value': "ip_geo"})
     else:
         buttons.insert(-2, {'label': 'Enable location override', 'value': "loc_override"})
@@ -61,11 +61,13 @@ def backend_menu(back_handler=None):
                 back_handler()
         return
     elif opt == "tts":
+        # TODO - opm scan
         tts = select("Choose a voice", list(CONFIGURATION["tts_configs"].keys()))
         CONFIGURATION["default_tts"] = tts
         with popup(f"Default TTS set to: {tts}"):
             put_code(json.dumps(CONFIGURATION["tts_configs"][tts], ensure_ascii=True, indent=2), "json")
     elif opt == "ww":
+        # TODO - opm scan
         ww = select("Choose a wake word",
                     list(CONFIGURATION["ww_configs"].keys()))
         CONFIGURATION["default_ww"] = ww
@@ -76,20 +78,20 @@ def backend_menu(back_handler=None):
                        placeholder="Anywhere street Any city Nº234",
                        required=True)
         data = GeolocationApi().get_geolocation(loc)
-        CONFIGURATION["default_location"] = data
+        CONFIGURATION["location"] = data
         with popup(f"Default location set to: {loc}"):
             put_code(json.dumps(data, ensure_ascii=True, indent=2), "json")
     elif opt == "loc_override":
-        CONFIGURATION["override_location"] = True
-        CONFIGURATION["geolocate"] = False
+        CONFIGURATION["server"]["override_location"] = True
+        CONFIGURATION["server"]["geolocate"] = False
         popup("Location override enabled!")
     elif opt == "ip_geo":
-        CONFIGURATION["geolocate"] = True
-        CONFIGURATION["override_location"] = False
+        CONFIGURATION["server"]["geolocate"] = True
+        CONFIGURATION["server"]["override_location"] = False
         popup("IP Geolocation enabled!")
     elif opt == "auth":
-        CONFIGURATION["skip_auth"] = not CONFIGURATION["skip_auth"]
-        if CONFIGURATION["skip_auth"]:
+        CONFIGURATION["server"]["skip_auth"] = not CONFIGURATION["server"]["skip_auth"]
+        if CONFIGURATION["server"]["skip_auth"]:
             popup("Device authentication enabled!")
         else:
             popup("Device authentication disabled! Pairing will not be needed")

@@ -4,7 +4,7 @@ import time
 
 from cutecharts.charts import Pie, Bar, Scatter
 
-from ovos_backend_manager.configuration import CONFIGURATION, DB
+from ovos_backend_manager.configuration import DB
 from pywebio.input import actions
 from pywebio.output import put_text, popup, put_code, put_markdown, put_html, use_scope, put_image
 

@@ -1,8 +1,3 @@
-import os
-import random
-
-from ovos_backend_manager.configuration import CONFIGURATION
-from ovos_local_backend.database.metrics import JsonMetricDatabase, Metric
 from ovos_local_backend.database.wakewords import JsonWakeWordDatabase, WakeWordRecording
 from os.path import dirname
 from os import listdir

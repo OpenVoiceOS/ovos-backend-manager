@@ -84,15 +84,17 @@ def device_menu(uuid, back_handler=None):
             device["opt_in"] = "opt_in" in opt_in
 
         elif opt == "tts":
+            # TODO - opm scan json
             tts = select("Choose a voice",
-                         list(CONFIGURATION["tts_configs"].keys()))
-            device["default_tts"] = CONFIGURATION["tts_configs"][tts]["module"]
-            device["default_tts_cfg"] = CONFIGURATION["tts_configs"][tts]
+                         list(k for k in CONFIGURATION["tts"].keys() if k not in ["module"]))
+            device["default_tts"] = CONFIGURATION["tts"]["module"]
+            device["default_tts_cfg"] = CONFIGURATION["tts"][tts]
         elif opt == "ww":
+            # TODO - opm scan json
             ww = select("Choose a wake word",
-                        list(CONFIGURATION["ww_configs"].keys()))
+                        list(CONFIGURATION["hotwords"].keys()))
             device["default_ww"] = ww
-            device["default_ww_cfg"] = CONFIGURATION["ww_configs"][ww]
+            device["default_ww_cfg"] = CONFIGURATION["hotwords"][ww]
         elif opt == "date":
             date = select("Change date format",
                           ['DMY', 'MDY'])

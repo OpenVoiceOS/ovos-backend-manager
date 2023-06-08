@@ -44,13 +44,14 @@ def prompt_admin_key():
     admin_key = textarea("insert your admin_key, this should have been set in your backend configuration file",
                          placeholder="SuperSecretPassword1!",
                          required=True)
-    if CONFIGURATION["admin_key"] != admin_key:
+    # TODO - validate key
+    if CONFIGURATION["server"]["admin_key"] != admin_key:
         popup("INVALID ADMIN KEY!")
         prompt_admin_key()
 
 
 def start():
-    if not CONFIGURATION["admin_key"]:
+    if not CONFIGURATION["server"]["admin_key"]:
         put_text("This personal backend instance does not have the admin interface exposed")
         exit(1)
     with use_scope("logo", clear=True):

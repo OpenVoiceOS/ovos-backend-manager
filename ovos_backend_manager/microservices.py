@@ -7,11 +7,14 @@ from pywebio.input import select, actions, input_group, input, TEXT, NUMBER
 from pywebio.output import put_text, put_table, popup, put_code, put_image, use_scope
 
 
+BLACKLISTED_PLUGS = ["ovos-stt-plugin-selene"]
+
+
 def _get_stt_opts(lang=None):
     STT_CONFIGS = {}
     if lang is not None:
         for p, data in get_stt_lang_configs(lang, include_dialects=True).items():
-            if p == "ovos-stt-plugin-selene":
+            if p in BLACKLISTED_PLUGS:
                 continue
             if not data:
                 continue
@@ -21,7 +24,7 @@ def _get_stt_opts(lang=None):
                 STT_CONFIGS[cfg["display_name"]] = cfg
     else:
         for p, data in get_stt_configs().items():
-            if p == "ovos-stt-plugin-selene":
+            if p in BLACKLISTED_PLUGS:
                 continue
             if not data:
                 continue
@@ -40,27 +43,14 @@ def microservices_menu(back_handler=None):
 
     with use_scope("main_view", clear=True):
         put_table([
-            ['STT module', CONFIGURATION["stt"]["module"]],
-            ['OVOS microservices fallback enabled', CONFIGURATION["microservices"]["ovos_fallback"]],
-
-            ['WolframAlpha provider', CONFIGURATION["microservices"]["wolfram_provider"]],
-            ['Weather provider', CONFIGURATION["microservices"]["weather_provider"]],
-            ['Geolocation provider', CONFIGURATION["microservices"]["geolocation_provider"]]
+            ['STT module', CONFIGURATION["stt"]["module"]]
         ])
 
     buttons = [{'label': 'Configure STT', 'value': "stt"},
                {'label': 'Configure Secrets', 'value': "secrets"},
-               {'label': 'Configure SMTP', 'value': "smtp"},
-               {'label': 'Configure Wolfram Alpha', 'value': "wolfram"},
-               {'label': 'Configure Weather', 'value': "weather"},
-               {'label': 'Configure Geolocation', 'value': "geo"}]
+               {'label': 'Configure SMTP', 'value': "smtp"}]
     if back_handler:
         buttons.insert(0, {'label': '<- Go Back', 'value': "main"})
-
-    if CONFIGURATION["microservices"]["ovos_fallback"]:
-        buttons.insert(-2, {'label': 'Disable OVOS microservices fallback', 'value': "ovos"})
-    else:
-        buttons.insert(-2, {'label': 'Enable OVOS microservices fallback', 'value': "ovos"})
 
     opt = actions(label="What would you like to do?", buttons=buttons)
     if opt == "main":
@@ -68,33 +58,6 @@ def microservices_menu(back_handler=None):
             if back_handler:
                 back_handler()
         return
-    elif opt == "geo":
-        opts = ["OpenStreetMap", "ArcGIS", "Geocode Farm"]  # TODO - ovos endpoint
-        provider = select("Choose a weather provider", opts)
-        if provider == "OpenStreetMap":
-            provider = "osm"
-        CONFIGURATION["microservices"]["geolocation_provider"] = provider.lower().replace(" ", "_")
-    elif opt == "weather":
-        opts = ["ovos"]
-        if CONFIGURATION["microservices"]["owm_key"]:
-            opts.append("local")
-        provider = select("Choose a weather provider", opts)
-        CONFIGURATION["microservices"]["weather_provider"] = provider
-    elif opt == "wolfram":
-        opts = ["ovos"]
-        if CONFIGURATION["microservices"]["wolfram_key"]:
-            opts.append("local")
-        provider = select("Choose a WolframAlpha provider", opts)
-        CONFIGURATION["microservices"]["wolfram_provider"] = provider
-    elif opt == "ovos":
-        CONFIGURATION["microservices"]["ovos_fallback"] = not CONFIGURATION["microservices"]["ovos_fallback"]
-        if CONFIGURATION["microservices"]["ovos_fallback"]:
-            with popup("OVOS microservices fallback enabled"):
-                put_text(
-                    "wolfram alpha and weather requests will be proxied trough OVOS services if local keys get rate limited/become invalid/are not set")
-        else:
-            with popup("OVOS microservices fallback disabled"):
-                put_text("please set your own wolfram alpha and weather keys")
     elif opt == "stt":
         lang = select("Choose STT default language",
                       list(get_stt_supported_langs().keys()))
@@ -118,7 +81,7 @@ def microservices_menu(back_handler=None):
         CONFIGURATION["microservices"]["owm_key"] = data["owm"]
         popup("Secrets updated!")
     elif opt == "smtp":
-        # TODO - ovos endpoint
+        # TODO  - ovos / neon endpoint
 
         if "smtp" not in CONFIGURATION["email"]:
             CONFIGURATION["email"]["smtp"] = {}

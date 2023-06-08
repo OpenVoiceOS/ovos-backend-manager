@@ -15,7 +15,7 @@ def get_oauth_data(app_id=None):
                     'token_endpoint': "https://",
                     'refresh_endpoint': "https://"}
     if "callback_endpoint" not in data:
-        backend_url = f"http://0.0.0.0:{CONFIGURATION['backend_port']}/{CONFIGURATION['api_version']}"
+        backend_url = f"http://0.0.0.0:{CONFIGURATION['server']['port']}/{CONFIGURATION['server']['version']}"
         data["callback_endpoint"] = f"{backend_url}/auth/callback/{app_id or '...'}"
 
     with use_scope("main_view", clear=True):

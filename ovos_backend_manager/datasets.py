@@ -7,7 +7,7 @@ from pywebio.input import actions, file_upload, input_group, textarea, select
 from pywebio.output import put_text, put_code, use_scope, put_markdown, popup, put_image, put_file, put_html, \
     put_buttons, put_table
 
-from ovos_backend_manager.configuration import CONFIGURATION, DB
+from ovos_backend_manager.configuration import DB
 
 
 def _render_ww(rec_id):
@@ -370,8 +370,6 @@ def ww_menu(back_handler=None):
                 popup("invalid format!")
 
             else:
-                os.makedirs(f"{CONFIGURATION['data_path']}/wakewords", exist_ok=True)
-
                 uuid = "AnonDevice"  # TODO - allow tagging to a device
 
                 meta = {
@@ -449,8 +447,6 @@ def utt_menu(back_handler=None):
                 popup("invalid format!")
             # if mime in ["application/json"]:
             else:
-                os.makedirs(f"{CONFIGURATION['data_path']}/utterances", exist_ok=True)
-
                 uuid = "AnonDevice"  # TODO - allow tagging to a device
 
                 meta = {

@@ -3,8 +3,6 @@
 a simple UI for [ovos-personal-backend](https://github.com/OpenVoiceOS/ovos-personal-backend), utility to manage all
 your devices
 
-If you are running ovos-core without a backend you can also run this on device and use the UI to view metrics, tag wake words and handle OAuth flow
-
 ![](./screenshots/demo.gif)
 
 ## Install
