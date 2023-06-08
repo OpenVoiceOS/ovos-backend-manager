@@ -17,11 +17,4 @@ from ovos_config import Configuration
 
 CONFIGURATION = Configuration()
 
-
-def store():
-    pass  # TODO - admin endpoint to update backend config
-
-
-CONFIGURATION.store = store
-
 DB = DatabaseApi(CONFIGURATION["server"].get("admin_key"))

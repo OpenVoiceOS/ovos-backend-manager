@@ -1,10 +1,12 @@
 import json
 import os
 
-from ovos_backend_manager.configuration import CONFIGURATION
+from ovos_backend_client.api import AdminApi, BackendType
 from ovos_backend_client.api import GeolocationApi
 from pywebio.input import textarea, select, actions
 from pywebio.output import put_table, put_markdown, popup, put_code, put_image, use_scope
+
+from ovos_backend_manager.configuration import CONFIGURATION
 
 
 def backend_menu(back_handler=None):
@@ -62,15 +64,16 @@ def backend_menu(back_handler=None):
         return
     elif opt == "tts":
         # TODO - opm scan
-        tts = select("Choose a voice", list(CONFIGURATION["tts_configs"].keys()))
-        CONFIGURATION["default_tts"] = tts
+        tts = select("Choose a voice", list(k for k in CONFIGURATION["tts"].keys()
+                                            if k not in ["module"]))
+        CONFIGURATION["tts"]["module"] = tts
         with popup(f"Default TTS set to: {tts}"):
-            put_code(json.dumps(CONFIGURATION["tts_configs"][tts], ensure_ascii=True, indent=2), "json")
+            put_code(json.dumps(CONFIGURATION["tts"][tts], ensure_ascii=True, indent=2), "json")
     elif opt == "ww":
         # TODO - opm scan
         ww = select("Choose a wake word",
-                    list(CONFIGURATION["ww_configs"].keys()))
-        CONFIGURATION["default_ww"] = ww
+                    list(CONFIGURATION["hotwords"].keys()))
+        CONFIGURATION["listener"]["wake_word"] = ww
         with popup(f"Default wake word set to: {ww}"):
             put_code(json.dumps(CONFIGURATION["ww_configs"][ww], ensure_ascii=True, indent=2), "json")
     elif opt == "geo":
@@ -114,5 +117,9 @@ def backend_menu(back_handler=None):
         CONFIGURATION["email"]["recipient"] = email
 
     if opt != "view":
-        CONFIGURATION.store()
+        admin = AdminApi(CONFIGURATION["server"].get("admin_key"),
+                         url=CONFIGURATION["server"].get("url"),
+                         backend_type=BackendType.PERSONAL)
+        admin.update_backend_config(CONFIGURATION)
+
     backend_menu(back_handler=back_handler)

@@ -1,11 +1,12 @@
 import json
 import os
 
-from ovos_backend_manager.configuration import CONFIGURATION
+from ovos_backend_client.api import AdminApi, BackendType
 from ovos_plugin_manager.stt import get_stt_configs, get_stt_supported_langs, get_stt_lang_configs
 from pywebio.input import select, actions, input_group, input, TEXT, NUMBER
-from pywebio.output import put_text, put_table, popup, put_code, put_image, use_scope
+from pywebio.output import put_table, popup, put_code, put_image, use_scope
 
+from ovos_backend_manager.configuration import CONFIGURATION
 
 BLACKLISTED_PLUGS = ["ovos-stt-plugin-selene"]
 
@@ -104,6 +105,9 @@ def microservices_menu(back_handler=None):
         with popup(f"SMTP configuration for: {data['host']}"):
             put_code(json.dumps(data, ensure_ascii=True, indent=2), "json")
 
-    CONFIGURATION.store()
+    admin = AdminApi(CONFIGURATION["server"].get("admin_key"),
+                     url=CONFIGURATION["server"].get("url"),
+                     backend_type=BackendType.PERSONAL)
+    admin.update_backend_config(CONFIGURATION)
 
     microservices_menu(back_handler=back_handler)
