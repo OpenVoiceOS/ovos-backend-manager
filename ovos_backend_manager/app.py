@@ -3,9 +3,9 @@ import os
 import requests
 from flask import Flask, request
 from oauthlib.oauth2 import WebApplicationClient
-from ovos_backend_manager.configuration import DB
 from pywebio.platform.flask import webio_view
 
+from ovos_backend_manager.apis import DB
 from ovos_backend_manager.menu import start
 
 os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'

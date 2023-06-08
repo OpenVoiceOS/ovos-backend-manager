@@ -1,6 +1,6 @@
-from ovos_backend_manager.configuration import CONFIGURATION
-from pywebio.input import textarea, actions
-from pywebio.output import put_text, popup, use_scope, put_image
+from ovos_config import Configuration, USER_CONFIG
+from pywebio.input import actions
+from pywebio.output import put_text, use_scope, put_image
 
 from ovos_backend_manager.backend import backend_menu
 from ovos_backend_manager.datasets import datasets_menu
@@ -40,24 +40,13 @@ def main_menu():
         metrics_menu(back_handler=main_menu)
 
 
-def prompt_admin_key():
-    admin_key = textarea("insert your admin_key, this should have been set in your backend configuration file",
-                         placeholder="SuperSecretPassword1!",
-                         required=True)
-    # TODO - validate key
-    if CONFIGURATION["server"]["admin_key"] != admin_key:
-        popup("INVALID ADMIN KEY!")
-        prompt_admin_key()
-
-
 def start():
-    if not CONFIGURATION["server"]["admin_key"]:
-        put_text("This personal backend instance does not have the admin interface exposed")
+    if not Configuration()["server"]["admin_key"]:
+        put_text(f"You need to set admin key in {USER_CONFIG}")
         exit(1)
     with use_scope("logo", clear=True):
         from os.path import dirname
         img = open(f'{dirname(__file__)}/res/personal_backend.png', 'rb').read()
         put_image(img)
 
-    prompt_admin_key()
     main_menu()

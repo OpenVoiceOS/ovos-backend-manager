@@ -1,12 +1,12 @@
 import json
 import os
 
-from ovos_backend_client.api import AdminApi, BackendType
-from ovos_backend_client.api import GeolocationApi
 from pywebio.input import textarea, select, actions
 from pywebio.output import put_table, put_markdown, popup, put_code, put_image, use_scope
+from ovos_backend_manager.apis import ADMIN, GEO
 
-from ovos_backend_manager.configuration import CONFIGURATION
+# TODO - from backend
+CONFIGURATION = {}
 
 
 def backend_menu(back_handler=None):
@@ -80,7 +80,7 @@ def backend_menu(back_handler=None):
         loc = textarea("Enter an address",
                        placeholder="Anywhere street Any city Nº234",
                        required=True)
-        data = GeolocationApi().get_geolocation(loc)
+        data = GEO.get_geolocation(loc)
         CONFIGURATION["location"] = data
         with popup(f"Default location set to: {loc}"):
             put_code(json.dumps(data, ensure_ascii=True, indent=2), "json")
@@ -117,9 +117,6 @@ def backend_menu(back_handler=None):
         CONFIGURATION["email"]["recipient"] = email
 
     if opt != "view":
-        admin = AdminApi(CONFIGURATION["server"].get("admin_key"),
-                         url=CONFIGURATION["server"].get("url"),
-                         backend_type=BackendType.PERSONAL)
-        admin.update_backend_config(CONFIGURATION)
+        ADMIN.update_backend_config(CONFIGURATION)
 
     backend_menu(back_handler=back_handler)

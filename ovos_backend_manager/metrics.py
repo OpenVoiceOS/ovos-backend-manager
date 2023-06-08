@@ -3,10 +3,10 @@ import os
 import time
 
 from cutecharts.charts import Pie, Bar, Scatter
-
-from ovos_backend_manager.configuration import DB
 from pywebio.input import actions
 from pywebio.output import put_text, popup, put_code, put_markdown, put_html, use_scope, put_image
+
+from ovos_backend_manager.apis import DB
 
 chart_type = Pie
 
@@ -54,7 +54,7 @@ def metrics_select(back_handler=None, uuid=None):
     if back_handler:
         buttons.insert(0, {'label': '<- Go Back', 'value': "main"})
     metric_id = actions(label="Select a metric to inspect",
-                  buttons=buttons)
+                        buttons=buttons)
     if metric_id == "main":
         device_select(back_handler=back_handler)
         return

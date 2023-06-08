@@ -1,11 +1,10 @@
 import json
 import os
+import random
 import time
 from uuid import uuid4
 
-from ovos_backend_manager.configuration import CONFIGURATION, DB
-import random
-from ovos_backend_client.api import GeolocationApi
+from ovos_backend_manager.apis import GEO
 from pywebio.input import textarea, select, actions, checkbox
 from pywebio.output import put_text, put_table, put_markdown, popup, put_code, use_scope, put_image
 
@@ -126,7 +125,7 @@ def device_menu(uuid, back_handler=None):
             loc = textarea("Enter an address",
                            placeholder="Anywhere street Any city Nº234",
                            required=True)
-            data = GeolocationApi().get_geolocation(loc)
+            data = GEO.get_geolocation(loc)
             device["location"] = data
         elif opt == "identity":
             identity = {"uuid": device["uuid"],

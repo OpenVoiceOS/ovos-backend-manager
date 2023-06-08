@@ -2,9 +2,11 @@ import json
 import os
 
 from oauthlib.oauth2 import WebApplicationClient
-from ovos_backend_manager.configuration import CONFIGURATION, DB
+from ovos_config import Configuration
 from pywebio.input import actions, input_group, input, TEXT
 from pywebio.output import use_scope, popup, put_image, put_link, put_code, put_text, put_table, put_markdown
+
+from ovos_backend_manager.apis import DB
 
 
 def get_oauth_data(app_id=None):
@@ -15,7 +17,8 @@ def get_oauth_data(app_id=None):
                     'token_endpoint': "https://",
                     'refresh_endpoint': "https://"}
     if "callback_endpoint" not in data:
-        backend_url = f"http://0.0.0.0:{CONFIGURATION['server']['port']}/{CONFIGURATION['server']['version']}"
+        server = Configuration().get("server")
+        backend_url = f"{server['url']}/{server['version']}"
         data["callback_endpoint"] = f"{backend_url}/auth/callback/{app_id or '...'}"
 
     with use_scope("main_view", clear=True):

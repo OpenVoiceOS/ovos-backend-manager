@@ -1,12 +1,10 @@
 import json
 import os
 
-from ovos_backend_client.api import AdminApi, BackendType
+from ovos_backend_manager.apis import ADMIN
 from ovos_plugin_manager.stt import get_stt_configs, get_stt_supported_langs, get_stt_lang_configs
 from pywebio.input import select, actions, input_group, input, TEXT, NUMBER
 from pywebio.output import put_table, popup, put_code, put_image, use_scope
-
-from ovos_backend_manager.configuration import CONFIGURATION
 
 BLACKLISTED_PLUGS = ["ovos-stt-plugin-selene"]
 
@@ -42,6 +40,9 @@ def microservices_menu(back_handler=None):
         img = open(f'{os.path.dirname(__file__)}/res/microservices_config.png', 'rb').read()
         put_image(img)
 
+    # TODO - config from admin api
+    CONFIGURATION = {}
+
     with use_scope("main_view", clear=True):
         put_table([
             ['STT module', CONFIGURATION["stt"]["module"]]
@@ -60,6 +61,8 @@ def microservices_menu(back_handler=None):
                 back_handler()
         return
     elif opt == "stt":
+        # TODO - new endpoint in backend for available langs
+        # depends on configured plugin backend side
         lang = select("Choose STT default language",
                       list(get_stt_supported_langs().keys()))
         cfgs = _get_stt_opts(lang)
@@ -105,9 +108,6 @@ def microservices_menu(back_handler=None):
         with popup(f"SMTP configuration for: {data['host']}"):
             put_code(json.dumps(data, ensure_ascii=True, indent=2), "json")
 
-    admin = AdminApi(CONFIGURATION["server"].get("admin_key"),
-                     url=CONFIGURATION["server"].get("url"),
-                     backend_type=BackendType.PERSONAL)
-    admin.update_backend_config(CONFIGURATION)
+    ADMIN.update_backend_config(CONFIGURATION)
 
     microservices_menu(back_handler=back_handler)

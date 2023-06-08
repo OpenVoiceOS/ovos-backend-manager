@@ -10,11 +10,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+from ovos_backend_client.api import DatabaseApi, AdminApi, GeolocationApi
 
-from ovos_backend_client.api import DatabaseApi
-
-from ovos_config import Configuration
-
-CONFIGURATION = Configuration()
-
-DB = DatabaseApi(CONFIGURATION["server"].get("admin_key"))
+DB = DatabaseApi()
+ADMIN = AdminApi()
+GEO = GeolocationApi()

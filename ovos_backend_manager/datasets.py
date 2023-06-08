@@ -7,11 +7,10 @@ from pywebio.input import actions, file_upload, input_group, textarea, select
 from pywebio.output import put_text, put_code, use_scope, put_markdown, popup, put_image, put_file, put_html, \
     put_buttons, put_table
 
-from ovos_backend_manager.configuration import DB
+from ovos_backend_manager.apis import DB
 
 
 def _render_ww(rec_id):
-
     def on_tag(bt):
         data["tag"] = bt
         DB.update_ww_recording(rec_id, tag=bt)
