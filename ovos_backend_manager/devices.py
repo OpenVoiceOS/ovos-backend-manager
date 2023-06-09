@@ -10,20 +10,24 @@ from pywebio.output import put_text, put_table, put_markdown, popup, put_code, u
 
 
 def device_menu(uuid, back_handler=None):
+    wws = {v["ww_id"]: v for v in DB.list_ww_definitions()}
+    voices = {v["voice_id"]: v for v in DB.list_voice_definitions()}
     buttons = [{'label': "View device configuration", 'value': "view"},
                {'label': "View device location", 'value': "view_loc"},
                {'label': "View device identity", 'value': "identity"},
                {'label': 'Change device name', 'value': "name"},
                {'label': 'Change placement', 'value': "location"},
                {'label': 'Change geographical location', 'value': "geo"},
-               {'label': 'Change wake word', 'value': "ww"},
-               {'label': 'Change voice', 'value': "tts"},
                {'label': 'Change email', 'value': "email"},
                {'label': 'Change opt-in', 'value': "opt-in"},
                {'label': 'Change date format', 'value': "date"},
                {'label': 'Change time format', 'value': "time"},
-               {'label': 'Change system units', 'value': "unit"},
-               {'label': 'Delete device', 'value': "delete"}]
+               {'label': 'Change system units', 'value': "unit"}]
+    if wws:
+        buttons.append({'label': 'Change wake word', 'value': "ww"})
+    if voices:
+        buttons.append({'label': 'Change voice', 'value': "tts"})
+    buttons.append({'label': 'Delete device', 'value': "delete"})
     if back_handler:
         buttons.insert(0, {'label': '<- Go Back', 'value': "main"})
 
@@ -32,33 +36,32 @@ def device_menu(uuid, back_handler=None):
             if l:
                 put_markdown(f'### Geolocation:')
                 put_table([
-                    ['City', d.location["city"]["name"]],
-                    ['State', d.location["city"]["state"]["name"]],
-                    ['Country', d.location["city"]["state"]["country"]["name"]],
-                    ['Country Code', d.location["city"]["state"]["country"]["code"]],
-                    ['Latitude', d.location["coordinate"]["latitude"]],
-                    ['Longitude', d.location["coordinate"]["longitude"]],
-                    ['Timezone Code', d.location["timezone"]["code"]]
+                    ['City', d["location"]["city"]["name"]],
+                    ['State', d["location"]["city"]["state"]["name"]],
+                    ['Country', d["location"]["city"]["state"]["country"]["name"]],
+                    ['Country Code', d["location"]["city"]["state"]["country"]["code"]],
+                    ['Latitude', d["location"]["coordinate"]["latitude"]],
+                    ['Longitude', d["location"]["coordinate"]["longitude"]],
+                    ['Timezone Code', d["location"]["timezone"]["code"]]
                 ])
             else:
                 put_markdown(f'### Configuration:')
                 put_table([
-                    ['Name', d.name],
-                    ['Location', d.device_location],
-                    ['Email', d.email],
-                    ['Date Format', d.date_format],
-                    ['Time Format', d.time_format],
-                    ['System Unit', d.system_unit],
-                    ['Opt In', d.opt_in],
-                    ['Lang', d.lang],
-                    ['Default Wake Word', d.default_ww],
-                    ['Default Voice', d.default_tts]
+                    ['Name', d["name"]],
+                    ['Placement', d["device_location"]],
+                    ['Email', d["email"]],
+                    ['Date Format', d["date_format"]],
+                    ['Time Format', d["time_format"]],
+                    ['System Unit', d["system_unit"]],
+                    ['Opt In', d["opt_in"]],
+                    ['Lang', d["lang"]],
+                    ['Default Wake Word', d["ww_id"]],
+                    ['Default Voice', d["voice_id"]]
                 ])
 
     device = DB.get_device(uuid)
     if device:
-        wws = {v["ww_id"]: v for v in DB.list_ww_definitions()}
-        voices = {v["voice_id"]: v for v in DB.list_voice_definitions()}
+        print(device)
 
         y = False
         opt = actions(label="What would you like to do?",
@@ -80,19 +83,23 @@ def device_menu(uuid, back_handler=None):
         elif opt == "opt-in":
             opt_in = checkbox("Open Dataset - device metrics and speech recordings",
                               [{'label': 'Store metrics and recordings',
-                                'selected': device.opt_in,
+                                'selected': device.get("opt_in", False),
                                 'value': "opt_in"}])
 
             device["opt_in"] = "opt_in" in opt_in
 
         elif opt == "tts":
             tts = select("Choose a voice", list(voices.keys()))
-            device["default_tts"] = voices[tts]["plugin"]
-            device["default_tts_cfg"] = voices[tts]["tts_config"]
+            device["voice_id"] = tts
+            with use_scope("main_view", clear=True):
+                put_markdown(f'### TTS Config')
+                put_code(json.dumps(voices[tts]["tts_config"], indent=4), "json")
         elif opt == "ww":
             ww = select("Choose a wake word",  list(wws.keys()))
-            device["default_ww"] = wws[ww]["name"]
-            device["default_ww_cfg"] = wws[ww]["ww_config"]
+            device["ww_id"] = ww
+            with use_scope("main_view", clear=True):
+                put_markdown(f'### Wake Word Config')
+                put_code(json.dumps(wws[ww]["ww_config"], indent=4), "json")
         elif opt == "date":
             date = select("Change date format",
                           ['DMY', 'MDY'])
@@ -139,7 +146,9 @@ def device_menu(uuid, back_handler=None):
         else:
             update_info(device, False)
 
-        if opt not in ["identity", "delete", "view_loc"]:
+        if opt not in ["identity", "delete", "view_loc", "view"]:
+            if "token" in device:
+                device.pop("token")
             DB.update_device(**device)
             popup("Device updated!")
         elif opt == "delete" and y:
