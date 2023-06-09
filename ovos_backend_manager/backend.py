@@ -118,7 +118,7 @@ def backend_menu(back_handler=None):
         email = textarea("Enter default notifications email",
                          placeholder="notify@me.com",
                          required=True)
-        backend_config["email"]["recipient"] = email
+        backend_config["microservices"]["email"]["recipient"] = email
 
     if opt != "view":
         ADMIN.update_backend_config(backend_config)

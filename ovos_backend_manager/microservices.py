@@ -15,7 +15,7 @@ def microservices_menu(back_handler=None):
 
     with use_scope("main_view", clear=True):
         put_table([
-            ['STT module', backend_config["stt"]["module"]]
+            ['Primary STT', backend_config["stt_servers"][0]]
         ])
 
     buttons = [{'label': 'Configure STT Server', 'value': "stt"},
@@ -32,7 +32,7 @@ def microservices_menu(back_handler=None):
         return
     elif opt == "stt":
         url = textarea("Enter STT servers (1 per line)",
-                       placeholder="https://openvoiceos.org/stt",
+                       placeholder="https://openvoiceos.org/stt\nhttps://fasterwhisper.ziggyai.online/stt",
                        required=True)
         backend_config["stt_servers"] = [u.strip() for u in url.split("\n") if u]
         popup(f"STT set to: {url}")
@@ -49,24 +49,24 @@ def microservices_menu(back_handler=None):
     elif opt == "smtp":
         # TODO  - ovos / neon endpoint
 
-        if "smtp" not in backend_config["email"]:
-            backend_config["email"]["smtp"] = {}
+        if "smtp" not in backend_config["microservices"]["email"]:
+            backend_config["microservices"]["email"]["smtp"] = {}
 
         data = input_group('SMTP Configuration', [
-            input("Username", value=backend_config["email"]["smtp"].get("username", 'user'),
+            input("Username", value=backend_config["microservices"]["email"]["smtp"].get("username", 'user'),
                   type=TEXT, name='username'),
-            input("Password", value=backend_config["email"]["smtp"].get("password", '***********'),
+            input("Password", value=backend_config["microservices"]["email"]["smtp"].get("password", '***********'),
                   type=TEXT, name='password'),
-            input("Host", value=backend_config["email"]["smtp"].get("host", 'smtp.mailprovider.com'),
+            input("Host", value=backend_config["microservices"]["email"]["smtp"].get("host", 'smtp.mailprovider.com'),
                   type=TEXT, name='host'),
-            input("Port", value=backend_config["email"]["smtp"].get("port", '465'),
+            input("Port", value=backend_config["microservices"]["email"]["smtp"].get("port", '465'),
                   type=NUMBER, name='port')
         ])
 
-        backend_config["email"]["smtp"]["username"] = data["username"]
-        backend_config["email"]["smtp"]["password"] = data["password"]
-        backend_config["email"]["smtp"]["host"] = data["host"]
-        backend_config["email"]["smtp"]["port"] = data["port"]
+        backend_config["microservices"]["email"]["smtp"]["username"] = data["username"]
+        backend_config["microservices"]["email"]["smtp"]["password"] = data["password"]
+        backend_config["microservices"]["email"]["smtp"]["host"] = data["host"]
+        backend_config["microservices"]["email"]["smtp"]["port"] = data["port"]
         with popup(f"SMTP configuration for: {data['host']}"):
             put_code(json.dumps(data, ensure_ascii=True, indent=2), "json")
 

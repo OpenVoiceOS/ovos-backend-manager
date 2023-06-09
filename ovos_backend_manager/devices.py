@@ -55,8 +55,8 @@ def device_menu(uuid, back_handler=None):
                     ['System Unit', d["system_unit"]],
                     ['Opt In', d["opt_in"]],
                     ['Lang', d["lang"]],
-                    ['Default Wake Word', d["ww_id"]],
-                    ['Default Voice', d["voice_id"]]
+                    ['Default Wake Word Id', d["ww_id"]],
+                    ['Default Voice Id', d["voice_id"]]
                 ])
 
     device = DB.get_device(uuid)
