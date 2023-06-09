@@ -3,7 +3,7 @@ import os
 
 from pywebio.input import textarea, select, actions
 from pywebio.output import put_table, put_markdown, popup, put_code, put_image, use_scope
-from ovos_backend_manager.apis import ADMIN, GEO
+from ovos_backend_manager.apis import ADMIN, GEO, DB
 
 
 def backend_menu(back_handler=None):
@@ -16,9 +16,9 @@ def backend_menu(back_handler=None):
     with use_scope("main_view", clear=True):
         put_table([
             ['Backend Port', backend_config["server"]["port"]],
-            ['Device Authentication enabled', not backend_config["server"]["skip_auth"]],
-            ['Location override enabled', backend_config["server"]["override_location"]],
-            ['IP Geolocation enabled', backend_config["server"]["geolocate"]],
+            ['Device Authentication enabled', not backend_config["server"].get("skip_auth", False)],
+            ['Location override enabled', backend_config["server"].get("override_location", False)],
+            ['IP Geolocation enabled', backend_config["server"].get("geolocate", True)],
             ['Default TTS', backend_config["tts"]["module"]],
             ['Default Wake Word', backend_config["listener"]["wake_word"]],
             ['Default date format', backend_config["date_format"]],
@@ -36,17 +36,22 @@ def backend_menu(back_handler=None):
             ['Longitude', backend_config["location"]["coordinate"]["longitude"]]
         ])
 
-    auth = 'Enable device auth' if not backend_config["server"]["skip_auth"] else 'Disable device auth'
+    auth = 'Enable device auth' if not backend_config["server"].get("skip_auth", False) else 'Disable device auth'
+
+    wws = {v["ww_id"]: v for v in DB.list_ww_definitions()}
+    voices = {v["voice_id"]: v for v in DB.list_voice_definitions()}
 
     buttons = [{'label': auth, 'value': "auth"},
                {'label': 'Set default location', 'value': "geo"},
-               {'label': 'Set default voice', 'value': "tts"},
-               {'label': 'Set default wake word', 'value': "ww"},
                {'label': 'Set default email', 'value': "email"},
                {'label': 'Set default date format', 'value': "date"},
                {'label': 'Set default time format', 'value': "time"},
                {'label': 'Set default system units', 'value': "unit"}
                ]
+    if len(wws):
+        buttons.append({'label': 'Set default wake word', 'value': "ww"})
+    if len(voices):
+        buttons.append({'label': 'Set default voice', 'value': "tts"})
     if back_handler:
         buttons.insert(0, {'label': '<- Go Back', 'value': "main"})
 
@@ -62,19 +67,19 @@ def backend_menu(back_handler=None):
                 back_handler()
         return
     elif opt == "tts":
-        # TODO - opm scan
-        tts = select("Choose a voice", list(k for k in backend_config["tts"].keys()
-                                            if k not in ["module"]))
-        backend_config["tts"]["module"] = tts
+
+        tts = select("Choose a voice", list(voices.keys()))
+        backend_config["default_values"]["voice_id"] = tts
         with popup(f"Default TTS set to: {tts}"):
-            put_code(json.dumps(backend_config["tts"][tts], ensure_ascii=True, indent=2), "json")
+            put_code(json.dumps(voices[tts]["tts_config"],
+                                ensure_ascii=False, indent=2), "json")
     elif opt == "ww":
-        # TODO - opm scan
         ww = select("Choose a wake word",
-                    list(backend_config["hotwords"].keys()))
-        backend_config["listener"]["wake_word"] = ww
+                    list(wws.keys()))
+        backend_config["default_values"]["ww_id"] = ww
         with popup(f"Default wake word set to: {ww}"):
-            put_code(json.dumps(backend_config["ww_configs"][ww], ensure_ascii=True, indent=2), "json")
+            put_code(json.dumps(wws[ww]["ww_config"],
+                                ensure_ascii=False, indent=2), "json")
     elif opt == "geo":
         loc = textarea("Enter an address",
                        placeholder="Anywhere street Any city Nº234",
@@ -82,7 +87,7 @@ def backend_menu(back_handler=None):
         data = GEO.get_geolocation(loc)
         backend_config["location"] = data
         with popup(f"Default location set to: {loc}"):
-            put_code(json.dumps(data, ensure_ascii=True, indent=2), "json")
+            put_code(json.dumps(data, ensure_ascii=False, indent=2), "json")
     elif opt == "loc_override":
         backend_config["server"]["override_location"] = True
         backend_config["server"]["geolocate"] = False
@@ -92,7 +97,7 @@ def backend_menu(back_handler=None):
         backend_config["server"]["override_location"] = False
         popup("IP Geolocation enabled!")
     elif opt == "auth":
-        backend_config["server"]["skip_auth"] = not backend_config["server"]["skip_auth"]
+        backend_config["server"]["skip_auth"] = not backend_config["server"].get("skip_auth", False)
         if backend_config["server"]["skip_auth"]:
             popup("Device authentication enabled!")
         else:

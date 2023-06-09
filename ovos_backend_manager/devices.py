@@ -4,7 +4,7 @@ import random
 import time
 from uuid import uuid4
 
-from ovos_backend_manager.apis import GEO
+from ovos_backend_manager.apis import GEO, DB
 from pywebio.input import textarea, select, actions, checkbox
 from pywebio.output import put_text, put_table, put_markdown, popup, put_code, use_scope, put_image
 
@@ -57,6 +57,9 @@ def device_menu(uuid, back_handler=None):
 
     device = DB.get_device(uuid)
     if device:
+        wws = {v["ww_id"]: v for v in DB.list_ww_definitions()}
+        voices = {v["voice_id"]: v for v in DB.list_voice_definitions()}
+
         y = False
         opt = actions(label="What would you like to do?",
                       buttons=buttons)
@@ -83,17 +86,13 @@ def device_menu(uuid, back_handler=None):
             device["opt_in"] = "opt_in" in opt_in
 
         elif opt == "tts":
-            # TODO - opm scan json
-            tts = select("Choose a voice",
-                         list(k for k in CONFIGURATION["tts"].keys() if k not in ["module"]))
-            device["default_tts"] = CONFIGURATION["tts"]["module"]
-            device["default_tts_cfg"] = CONFIGURATION["tts"][tts]
+            tts = select("Choose a voice", list(voices.keys()))
+            device["default_tts"] = voices[tts]["plugin"]
+            device["default_tts_cfg"] = voices[tts]["tts_config"]
         elif opt == "ww":
-            # TODO - opm scan json
-            ww = select("Choose a wake word",
-                        list(CONFIGURATION["hotwords"].keys()))
-            device["default_ww"] = ww
-            device["default_ww_cfg"] = CONFIGURATION["hotwords"][ww]
+            ww = select("Choose a wake word",  list(wws.keys()))
+            device["default_ww"] = wws[ww]["name"]
+            device["default_ww_cfg"] = wws[ww]["ww_config"]
         elif opt == "date":
             date = select("Change date format",
                           ['DMY', 'MDY'])

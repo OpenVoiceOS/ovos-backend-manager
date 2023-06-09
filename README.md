@@ -5,6 +5,10 @@ your devices
 
 ![](./screenshots/demo.gif)
 
+WARNING: personal-backend 0.2.0 introduced breaking changes
+
+if you are running personal-backend <= 0.1.5 use [backend-0.1.5 branch](https://github.com/OpenVoiceOS/ovos-backend-manager/tree/backend-0.1.5)
+
 ## Install
 
 `pip install ovos-backend-manager`

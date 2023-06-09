@@ -8,6 +8,7 @@ from ovos_backend_manager.devices import device_select, instant_pair
 from ovos_backend_manager.metrics import metrics_menu
 from ovos_backend_manager.microservices import microservices_menu
 from ovos_backend_manager.oauth import oauth_menu
+from ovos_backend_manager.apis import ADMIN
 
 
 def main_menu():
@@ -44,6 +45,14 @@ def start():
     if not Configuration()["server"]["admin_key"]:
         put_text(f"You need to set admin key in {USER_CONFIG}")
         exit(1)
+
+    try:
+        ADMIN.get_backend_config()
+    except Exception as e:
+        print(e)
+        put_text(f"Backend refused admin key or does not have AdminApi enabled")
+        exit(2)
+
     with use_scope("logo", clear=True):
         from os.path import dirname
         img = open(f'{dirname(__file__)}/res/personal_backend.png', 'rb').read()

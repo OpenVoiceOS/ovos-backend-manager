@@ -10,8 +10,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-from ovos_backend_client.api import DatabaseApi, AdminApi, GeolocationApi
+from ovos_backend_client.api import DatabaseApi, AdminApi, GeolocationApi, DatasetApi, BackendType
+from ovos_config import Configuration
 
-DB = DatabaseApi()
-ADMIN = AdminApi()
-GEO = GeolocationApi()
+_cfg = Configuration()["server"]
+
+print(_cfg)
+
+DB = DatabaseApi(_cfg["admin_key"],
+                 url=_cfg["url"], backend_type=BackendType.PERSONAL)
+ADMIN = AdminApi(_cfg["admin_key"],
+                 url=_cfg["url"], backend_type=BackendType.PERSONAL)
+GEO = GeolocationApi(backend_type=BackendType.OFFLINE)  # helper
+DATASET = DatasetApi(url=_cfg["url"], backend_type=BackendType.PERSONAL)  # upload
