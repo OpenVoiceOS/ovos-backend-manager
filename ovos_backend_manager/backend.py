@@ -19,8 +19,8 @@ def backend_menu(back_handler=None):
             ['Device Authentication enabled', not backend_config["server"].get("skip_auth", False)],
             ['Location override enabled', backend_config["server"].get("override_location", False)],
             ['IP Geolocation enabled', backend_config["server"].get("geolocate", True)],
-            ['Default TTS', backend_config["tts"]["module"]],
-            ['Default Wake Word', backend_config["listener"]["wake_word"]],
+            ['Default Voice Id', backend_config["default_values"]["voice_id"]],
+            ['Default Wake Word Id', backend_config["default_values"]["ww_id"]],
             ['Default date format', backend_config["date_format"]],
             ['Default time format', backend_config["time_format"]],
             ['Default system units', backend_config["system_unit"]]

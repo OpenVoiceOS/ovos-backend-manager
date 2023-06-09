@@ -61,8 +61,6 @@ def device_menu(uuid, back_handler=None):
 
     device = DB.get_device(uuid)
     if device:
-        print(device)
-
         y = False
         opt = actions(label="What would you like to do?",
                       buttons=buttons)

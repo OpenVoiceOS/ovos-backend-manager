@@ -2,37 +2,8 @@ import json
 import os
 
 from ovos_backend_manager.apis import ADMIN
-from ovos_plugin_manager.stt import get_stt_configs, get_stt_supported_langs, get_stt_lang_configs
-from pywebio.input import select, actions, input_group, input, TEXT, NUMBER
+from pywebio.input import select, actions, input_group, input, TEXT, NUMBER, textarea
 from pywebio.output import put_table, popup, put_code, put_image, use_scope
-
-BLACKLISTED_PLUGS = ["ovos-stt-plugin-selene"]
-
-
-def _get_stt_opts(lang=None):
-    STT_CONFIGS = {}
-    if lang is not None:
-        for p, data in get_stt_lang_configs(lang, include_dialects=True).items():
-            if p in BLACKLISTED_PLUGS:
-                continue
-            if not data:
-                continue
-            for cfg in data:
-                cfg["module"] = p
-                cfg["display_name"] = f"{cfg['display_name']} [{p}]"
-                STT_CONFIGS[cfg["display_name"]] = cfg
-    else:
-        for p, data in get_stt_configs().items():
-            if p in BLACKLISTED_PLUGS:
-                continue
-            if not data:
-                continue
-            for lang, confs in data.items():
-                for cfg in confs:
-                    cfg["module"] = p
-                    cfg["display_name"] = f"{cfg['display_name']} [{p}]"
-                    STT_CONFIGS[cfg["display_name"]] = cfg
-    return STT_CONFIGS
 
 
 def microservices_menu(back_handler=None):
@@ -47,7 +18,7 @@ def microservices_menu(back_handler=None):
             ['STT module', backend_config["stt"]["module"]]
         ])
 
-    buttons = [{'label': 'Configure STT', 'value': "stt"},
+    buttons = [{'label': 'Configure STT Server', 'value': "stt"},
                {'label': 'Configure Secrets', 'value': "secrets"},
                {'label': 'Configure SMTP', 'value': "smtp"}]
     if back_handler:
@@ -60,19 +31,11 @@ def microservices_menu(back_handler=None):
                 back_handler()
         return
     elif opt == "stt":
-        # TODO - new endpoint in backend for available langs
-        # depends on configured plugin backend side
-        lang = select("Choose STT default language",
-                      list(get_stt_supported_langs().keys()))
-        cfgs = _get_stt_opts(lang)
-        opts = list(cfgs.keys())
-        stt = select("Choose a speech to text engine", opts)
-        cfg = dict(cfgs[stt])
-        m = cfg.pop("module")
-        backend_config["stt"]["module"] = m
-        backend_config["stt"][m] = cfg
-        with popup(f"STT set to: {stt}"):
-            put_code(json.dumps(cfg, ensure_ascii=True, indent=2), "json")
+        url = textarea("Enter STT servers (1 per line)",
+                       placeholder="https://openvoiceos.org/stt",
+                       required=True)
+        backend_config["stt_servers"] = [u.strip() for u in url.split("\n") if u]
+        popup(f"STT set to: {url}")
     elif opt == "secrets":
         data = input_group('Secret Keys', [
             input("WolframAlpha key", value=backend_config["microservices"]["wolfram_key"],
