@@ -1,6 +1,6 @@
-from ovos_local_backend.configuration import CONFIGURATION
-from pywebio.input import textarea, actions
-from pywebio.output import put_text, popup, use_scope, put_image
+from ovos_config import Configuration, USER_CONFIG
+from pywebio.input import actions
+from pywebio.output import put_text, use_scope, put_image
 
 from ovos_backend_manager.backend import backend_menu
 from ovos_backend_manager.datasets import datasets_menu
@@ -8,7 +8,7 @@ from ovos_backend_manager.devices import device_select, instant_pair
 from ovos_backend_manager.metrics import metrics_menu
 from ovos_backend_manager.microservices import microservices_menu
 from ovos_backend_manager.oauth import oauth_menu
-from ovos_backend_manager.selene import selene_menu
+from ovos_backend_manager.apis import ADMIN
 
 
 def main_menu():
@@ -24,8 +24,7 @@ def main_menu():
                            {'label': 'Manage Datasets', 'value': "db"},
                            {'label': 'OAuth Applications', 'value': "oauth"},
                            {'label': 'Configure Backend', 'value': "backend"},
-                           {'label': 'Configure Microservices', 'value': "services"},
-                           {'label': 'Configure Selene Proxy', 'value': "selene"}])
+                           {'label': 'Configure Microservices', 'value': "services"}])
     if opt == "pair":
         instant_pair(back_handler=main_menu)
     elif opt == "services":
@@ -36,31 +35,27 @@ def main_menu():
         datasets_menu(back_handler=main_menu)
     elif opt == "backend":
         backend_menu(back_handler=main_menu)
-    elif opt == "selene":
-        selene_menu(back_handler=main_menu)
     elif opt == "device":
         device_select(back_handler=main_menu)
     elif opt == "metrics":
         metrics_menu(back_handler=main_menu)
 
 
-def prompt_admin_key():
-    admin_key = textarea("insert your admin_key, this should have been set in your backend configuration file",
-                         placeholder="SuperSecretPassword1!",
-                         required=True)
-    if CONFIGURATION["admin_key"] != admin_key:
-        popup("INVALID ADMIN KEY!")
-        prompt_admin_key()
-
-
 def start():
-    if not CONFIGURATION["admin_key"]:
-        put_text("This personal backend instance does not have the admin interface exposed")
+    if not Configuration()["server"]["admin_key"]:
+        put_text(f"You need to set admin key in {USER_CONFIG}")
         exit(1)
+
+    try:
+        ADMIN.get_backend_config()
+    except Exception as e:
+        print(e)
+        put_text(f"Backend refused admin key or does not have AdminApi enabled")
+        exit(2)
+
     with use_scope("logo", clear=True):
         from os.path import dirname
         img = open(f'{dirname(__file__)}/res/personal_backend.png', 'rb').read()
         put_image(img)
 
-    prompt_admin_key()
     main_menu()

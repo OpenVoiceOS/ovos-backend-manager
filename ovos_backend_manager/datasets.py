@@ -3,28 +3,24 @@ import os
 import time
 from base64 import b64encode
 
-from ovos_local_backend.configuration import CONFIGURATION
-from ovos_local_backend.database.settings import DeviceDatabase
-from ovos_local_backend.database.utterances import JsonUtteranceDatabase
-from ovos_local_backend.database.wakewords import JsonWakeWordDatabase
 from pywebio.input import actions, file_upload, input_group, textarea, select
 from pywebio.output import put_text, put_code, use_scope, put_markdown, popup, put_image, put_file, put_html, \
     put_buttons, put_table
 
+from ovos_backend_manager.apis import DB
 
-def _render_ww(idx, db=None):
-    db = db or JsonWakeWordDatabase()
 
+def _render_ww(rec_id):
     def on_tag(bt):
         data["tag"] = bt
-        db[idx]["tag"] = bt
-        db.commit()
-        _render_ww(idx, db)
+        DB.update_ww_recording(rec_id, tag=bt)
+        _render_ww(rec_id)
 
     with use_scope("main_view", clear=True):
-        data = db[idx]  # id == db_position + 1
+        data = DB.get_ww_recording(rec_id)
         data["tag"] = data.get("tag") or "untagged"
 
+        # TODO - get binary_data directly
         if os.path.isfile(data["path"]):
             content = open(data["path"], 'rb').read()
             html = f"""
@@ -50,72 +46,73 @@ def _render_ww(idx, db=None):
 
 def ww_select(back_handler=None, uuid=None, ww=None):
     buttons = []
-    db = JsonWakeWordDatabase()
-    if not len(db):
+    if not len(DB.list_ww_recordings()):
         with use_scope("main_view", clear=True):
             put_text("No wake words uploaded yet!")
         datasets_menu(back_handler=back_handler)
         return
 
-    for m in db:
+    for m in DB.list_ww_recordings():
         if uuid is not None and m["uuid"] != uuid:
             continue
         if ww is not None and m["transcription"] != ww:
             continue
-        name = f"{m['wakeword_id']}-{m['transcription']}"
-        buttons.append({'label': name, 'value': m['wakeword_id']})
+        name = f"{m['recording_id']}-{m['transcription']}"
+        buttons.append({'label': name, 'value': m['recording_id']})
 
     if len(buttons) == 0:
         with use_scope("main_view", clear=True):
             put_text("No wake words uploaded from this device yet!")
-        opt = "main"
-    else:
-        if back_handler:
-            buttons.insert(0, {'label': '<- Go Back', 'value': "main"})
-        opt = actions(label="Select a WakeWord recording",
-                      buttons=buttons)
-    if opt == "main":
         ww_menu(back_handler=back_handler)
         return
 
-    _render_ww(opt - 1, db)
+    elif back_handler:
+        buttons.insert(0, {'label': '<- Go Back', 'value': "main"})
 
-    ww_select(back_handler=back_handler, ww=ww, uuid=uuid)
+    rec_id = actions(label="Select a WakeWord recording", buttons=buttons)
+
+    if rec_id == "main":  # go back
+        ww_menu(back_handler=back_handler)
+    else:
+        _render_ww(rec_id)
+        ww_select(back_handler=back_handler, ww=ww, uuid=uuid)
 
 
 def utt_select(back_handler=None, uuid=None, utt=None):
     buttons = []
-    db = JsonUtteranceDatabase()
-    if not len(db):
+    if not len(DB.list_stt_recordings()):
         with use_scope("main_view", clear=True):
             put_text("No utterances uploaded yet!")
         datasets_menu(back_handler=back_handler)
         return
 
-    for m in db:
+    for m in DB.list_stt_recordings():
         if uuid is not None and m["uuid"] != uuid:
             continue
         if utt is not None and m["transcription"] != utt:
             continue
-        name = f"{m['utterance_id']}-{m['transcription']}"
-        buttons.append({'label': name, 'value': m['utterance_id']})
+        name = f"{m['recording_id']}-{m['transcription']}"
+        buttons.append({'label': name, 'value': m['recording_id']})
 
     if len(buttons) == 0:
         with use_scope("main_view", clear=True):
             put_text("No utterances uploaded from this device yet!")
-        opt = "main"
+        utt_menu(back_handler=back_handler)
+        return
     else:
         if back_handler:
             buttons.insert(0, {'label': '<- Go Back', 'value': "main"})
-        opt = actions(label="Select a Utterance recording",
-                      buttons=buttons)
-    if opt == "main":
-        utt_menu(back_handler=back_handler)
-        return
+        rec_id = actions(label="Select a Utterance recording",
+                         buttons=buttons)
+        if rec_id == "main":
+            utt_menu(back_handler=back_handler)
+            return
 
     with use_scope("main_view", clear=True):
-        data = db[opt - 1]  # id == db_position + 1
+        # opt is recording_id
+        data = DB.get_stt_recording(rec_id)
         put_code(json.dumps(data, indent=4), "json")
+        # TODO - get binary data from api
         if os.path.isfile(data["path"]):
             content = open(data["path"], 'rb').read()
             html = f"""<audio controls src="data:audio/x-wav;base64,{b64encode(content).decode('ascii')}" />"""
@@ -128,8 +125,8 @@ def utt_select(back_handler=None, uuid=None, utt=None):
 
 
 def device_select(back_handler=None, ww=True):
-    devices = {uuid: f"{device['name']}@{device['device_location']}"
-               for uuid, device in DeviceDatabase().items()}
+    devices = {device["uuid"]: f"{device['name']}@{device['device_location']}"
+               for device in DB.list_devices()}
     buttons = [{'label': "All Devices", 'value': "all"},
                {'label': "Unknown Devices", 'value': "AnonDevice"}] + \
               [{'label': d, 'value': uuid} for uuid, d in devices.items()]
@@ -159,7 +156,7 @@ def device_select(back_handler=None, ww=True):
 
 
 def ww_opts(back_handler=None, uuid=None):
-    wws = list(set([ww["transcription"] for ww in JsonWakeWordDatabase()]))
+    wws = list(set([ww["transcription"] for ww in DB.list_ww_recordings()]))
     buttons = [{'label': "All Wake Words", 'value': "all"}] + \
               [{'label': ww, 'value': ww} for ww in wws]
     if back_handler:
@@ -180,7 +177,7 @@ def ww_opts(back_handler=None, uuid=None):
 
 
 def utt_opts(back_handler=None, uuid=None):
-    utts = list(set([ww["transcription"] for ww in JsonUtteranceDatabase()]))
+    utts = list(set([ww["transcription"] for ww in DB.list_stt_recordings()]))
     buttons = [{'label': "All Utterances", 'value': "all"}] + \
               [{'label': ww, 'value': ww} for ww in utts]
     if back_handler:
@@ -200,9 +197,7 @@ def utt_opts(back_handler=None, uuid=None):
         utt_menu(back_handler=back_handler)
 
 
-def _render_ww_tagger(selected_idx, selected_wws, db=None, untagged_only=False):
-    db = db or JsonWakeWordDatabase()
-
+def _render_ww_tagger(selected_idx, selected_wws, untagged_only=False):
     def on_tag(tag):
         nonlocal selected_idx, selected_wws
 
@@ -219,21 +214,19 @@ def _render_ww_tagger(selected_idx, selected_wws, db=None, untagged_only=False):
                 return on_tag(tag)  # recurse
 
         elif selected_idx is not None:
-            db_id = selected_wws[selected_idx]["wakeword_id"]
-            db[db_id]["tag"] = selected_wws[selected_idx]["tag"] = tag
-            db.commit()
+            db_id = selected_wws[selected_idx]["recording_id"]
+            DB.update_ww_recording(db_id, tag=tag)
 
-        _render_ww_tagger(selected_idx, selected_wws, db, untagged_only=untagged_only)
+        _render_ww_tagger(selected_idx, selected_wws, untagged_only=untagged_only)
 
     def on_gender(tag):
         nonlocal selected_idx, selected_wws
 
         if selected_idx is not None:
-            db_id = selected_wws[selected_idx]["wakeword_id"]
-            db[db_id]["speaker_type"] = selected_wws[selected_idx]["speaker_type"] = tag
-            db.commit()
+            db_id = selected_wws[selected_idx]["recording_id"]
+            DB.update_ww_recording(db_id, speaker_type=tag)
 
-        _render_ww_tagger(selected_idx, selected_wws, db, untagged_only=untagged_only)
+        _render_ww_tagger(selected_idx, selected_wws, untagged_only=untagged_only)
 
     with use_scope("main_view", clear=True):
         content = open(selected_wws[selected_idx]["path"], 'rb').read()
@@ -258,8 +251,6 @@ def ww_tagger(back_handler=None, selected_wws=None, selected_idx=None, untagged_
         img = open(f'{os.path.dirname(__file__)}/res/wakewords.png', 'rb').read()
         put_image(img)
 
-    db = JsonWakeWordDatabase()
-
     def get_next_untagged():
         nonlocal selected_idx
         if untagged_only:
@@ -271,7 +262,7 @@ def ww_tagger(back_handler=None, selected_wws=None, selected_idx=None, untagged_
                 selected_idx = 0
 
     if not selected_wws:
-        wws = set([w["transcription"] for w in db
+        wws = set([w["transcription"] for w in DB.list_ww_recordings()
                    if os.path.isfile(w["path"])])
         if not len(wws):
             with use_scope("main_view", clear=True):
@@ -279,7 +270,7 @@ def ww_tagger(back_handler=None, selected_wws=None, selected_idx=None, untagged_
             datasets_menu(back_handler=back_handler)
             return
         current_ww = select("Target WW", wws)
-        selected_wws = [w for w in db
+        selected_wws = [w for w in DB.list_ww_recordings()
                         if w["transcription"] == current_ww
                         and os.path.isfile(w["path"])]
         selected_idx = 0
@@ -296,7 +287,7 @@ def ww_tagger(back_handler=None, selected_wws=None, selected_idx=None, untagged_
         if "speaker_type" not in ww:
             selected_wws[idx]["speaker_type"] = "untagged"
 
-    _render_ww_tagger(selected_idx, selected_wws, db, untagged_only)
+    _render_ww_tagger(selected_idx, selected_wws, untagged_only)
 
     buttons = [
         {'label': "Show all recordings" if untagged_only else 'Show untagged only', 'value': "toggle"},
@@ -326,10 +317,9 @@ def ww_tagger(back_handler=None, selected_wws=None, selected_idx=None, untagged_
             for ww in selected_wws:
                 if os.path.isfile(ww["path"]):
                     os.remove(ww["path"])
-                dbid = db.get_item_id(ww)
-                if dbid >= 0:
-                    db.remove_item(dbid)
-            db.commit()
+
+                rec_id = current_ww  # TODO - rec_id
+                DB.delete_ww_recording(rec_id)
 
             with use_scope("main_view", clear=True):
                 put_text(f"{current_ww} database deleted!")
@@ -379,14 +369,10 @@ def ww_menu(back_handler=None):
                 popup("invalid format!")
 
             else:
-                os.makedirs(f"{CONFIGURATION['data_path']}/wakewords", exist_ok=True)
-
                 uuid = "AnonDevice"  # TODO - allow tagging to a device
-                wav_path = f"{CONFIGURATION['data_path']}/wakewords/{name}.{filename}"
-                meta_path = f"{CONFIGURATION['data_path']}/wakewords/{name}.{filename}.meta"
+
                 meta = {
                     "transcription": name,
-                    "path": wav_path,
                     "meta": {
                         "name": name,
                         "time": time.time(),
@@ -397,12 +383,8 @@ def ww_menu(back_handler=None):
                     },
                     "uuid": uuid
                 }
-                with JsonWakeWordDatabase() as db:
-                    db.add_wakeword(name, wav_path, meta, uuid)
-                with open(wav_path, "wb") as f:
-                    f.write(content)
-                with open(meta_path, "w") as f:
-                    json.dump(meta, f)
+                rec = DB.add_ww_recording(byte_data=content, transcription=name, metadata=meta)
+
                 with popup("wake word uploaded!"):
                     put_code(json.dumps(meta, indent=4), "json")
 
@@ -415,15 +397,13 @@ def ww_menu(back_handler=None):
                       buttons=[{'label': "yes", 'value': True},
                                {'label': "no", 'value': False}])
         if opt:
-            # remove ww files from path
-            db = JsonWakeWordDatabase()
-            for ww in db:
-                if os.path.isfile(ww["path"]):
-                    os.remove(ww["path"])
-            # remove db itself
-            os.remove(db.db.path)
+
+            for rec in DB.list_ww_recordings():
+                DB.delete_ww_recording(rec_id=rec["recording_id"])
+
             with use_scope("main_view", clear=True):
                 put_text("wake word database deleted!")
+
         datasets_menu(back_handler=back_handler)
         return
     if opt == "main":
@@ -466,21 +446,13 @@ def utt_menu(back_handler=None):
                 popup("invalid format!")
             # if mime in ["application/json"]:
             else:
-                os.makedirs(f"{CONFIGURATION['data_path']}/utterances", exist_ok=True)
-
                 uuid = "AnonDevice"  # TODO - allow tagging to a device
-                path = f"{CONFIGURATION['data_path']}/utterances/{utterance}.{filename}"
 
                 meta = {
                     "transcription": utterance,
-                    "path": path,
                     "uuid": uuid
                 }
-                with JsonUtteranceDatabase() as db:
-                    db.add_utterance(utterance, path, uuid)
-
-                with open(path, "wb") as f:
-                    f.write(content)
+                DB.add_stt_recording(content, utterance, meta)
 
                 with popup("utterance recording uploaded!"):
                     put_code(json.dumps(meta, indent=4), "json")
@@ -494,8 +466,10 @@ def utt_menu(back_handler=None):
                       buttons=[{'label': "yes", 'value': True},
                                {'label': "no", 'value': False}])
         if opt:
-            # TODO - also remove files from path
-            os.remove(JsonUtteranceDatabase().db.path)
+
+            for rec in DB.list_stt_recordings():
+                DB.delete_stt_recording(rec["recording_id"])
+
             with use_scope("main_view", clear=True):
                 put_text("utterance database deleted!")
         datasets_menu(back_handler=back_handler)

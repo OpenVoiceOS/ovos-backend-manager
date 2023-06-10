@@ -3,9 +3,9 @@ import os
 import requests
 from flask import Flask, request
 from oauthlib.oauth2 import WebApplicationClient
-from ovos_local_backend.database.oauth import OAuthTokenDatabase, OAuthApplicationDatabase
 from pywebio.platform.flask import webio_view
 
+from ovos_backend_manager.apis import DB
 from ovos_backend_manager.menu import start
 
 os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
@@ -23,7 +23,7 @@ def oauth_callback(oauth_id):
     params = dict(request.args)
     code = params["code"]
 
-    data = OAuthApplicationDatabase()[oauth_id]
+    data = DB.get_oauth_app(oauth_id)
     client_id = data["client_id"]
     client_secret = data["client_secret"]
     token_endpoint = data["token_endpoint"]
@@ -43,8 +43,7 @@ def oauth_callback(oauth_id):
         auth=(client_id, client_secret),
     ).json()
 
-    with OAuthTokenDatabase() as db:
-        db.add_token(oauth_id, token_response)
+    DB.add_oauth_token(oauth_id, token_response)
 
     return params
 
