@@ -63,7 +63,7 @@ setup(
     description='UI to manage OpenVoiceOS backends',
     entry_points={
         'console_scripts': [
-            'ovos-backend-manager=ovos_backend_manager.__main__:main'
+            'ovos-backend-manager=ovos_backend_manager.app:main'
         ]
     }
 )
