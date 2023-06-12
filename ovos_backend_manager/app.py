@@ -4,9 +4,9 @@ os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
 from ovos_config.utils import init_module_config
 
-init_module_config("ovos_backend_manager",
-                   "ovos_backend_manager",
-                   {"config_filename": "ovos_backend_manager.conf"})
+init_module_config("ovos_backend_manager", "ovos_backend_manager",
+                   {"config_filename": "ovos_backend_manager.conf",
+                    "base_folder": "ovos_backend_manager"})
 
 import requests
 from flask import Flask, request
