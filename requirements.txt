@@ -1,3 +1,4 @@
 pywebio
 ovos-backend-client
+ovos_config
 cutecharts
