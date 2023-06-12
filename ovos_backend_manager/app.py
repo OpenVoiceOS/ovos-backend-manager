@@ -1,5 +1,13 @@
 import os
 
+os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+
+from ovos_config.utils import init_module_config
+
+init_module_config("ovos_backend_manager",
+                   "ovos_backend_manager",
+                   {"config_filename": "ovos_backend_manager.conf"})
+
 import requests
 from flask import Flask, request
 from oauthlib.oauth2 import WebApplicationClient
@@ -8,7 +16,6 @@ from pywebio.platform.flask import webio_view
 from ovos_backend_manager.apis import DB
 from ovos_backend_manager.menu import start
 
-os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
 app = Flask(__name__)
 
